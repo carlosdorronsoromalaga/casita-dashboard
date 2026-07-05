@@ -91,8 +91,9 @@
     <option value="nl">📍 Países Bajos</option>
     <option value="nl_remote">NL + Remoto</option>
     <option value="lu">Luxemburgo</option>
-    <option value="remote">Solo remoto</option>
-    <option value="all">Toda Europa / todas</option>
+    <option value="europe">🇪🇺 Europa (sin US)</option>
+    <option value="remote_eu">Remoto (sin US)</option>
+    <option value="all">Todas</option>
   </select>
   <select id="site"><option value="">Todas las fuentes</option></select>
   <label class="toggle"><input type="checkbox" id="noDutch" checked> Sin holandés requerido</label>
@@ -224,7 +225,8 @@ function visible() {
       if (scope === 'nl' && !j.is_nl) return false;
       if (scope === 'nl_remote' && !j.is_nl && !j.is_remote) return false;
       if (scope === 'lu' && !j.is_lu) return false;
-      if (scope === 'remote' && !j.is_remote) return false;
+      if (scope === 'europe' && !(j.is_europe || (j.is_remote && !j.is_us))) return false;
+      if (scope === 'remote_eu' && !(j.is_remote && !j.is_us)) return false;
       if ($('noDutch').checked && j.needs_dutch) return false;
       if ($('noSenior').checked && j.is_senior) return false;
       if ($('withCv').checked && !j.cv_exists) return false;
