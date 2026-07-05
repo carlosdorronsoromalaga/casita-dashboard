@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ApplyBoard — búsqueda de empleo NL</title>
+<style>
+  :root { --bg:#0f1419; --panel:#1a2129; --panel2:#232c36; --text:#e6edf3; --muted:#8b98a5;
+          --accent:#60a5fa; --accent2:#3b82f6; --green:#4ade80; --danger:#f87171; --gold:#fbbf24; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; }
+  header { padding:14px 24px; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+           border-bottom:1px solid #2b3644; position:sticky; top:0; background:var(--bg); z-index:500; }
+  header h1 { font-size:19px; color:var(--accent); }
+  .kpis { display:flex; gap:10px; flex-wrap:wrap; margin-left:auto; }
+  .kpi { background:var(--panel); border:1px solid #2b3644; border-radius:10px; padding:6px 14px;
+         text-align:center; }
+  .kpi .n { font-size:17px; font-weight:700; color:var(--accent); }
+  .kpi .l { font-size:10px; color:var(--muted); }
+  .kpi.good .n { color:var(--green); } .kpi.bad .n { color:var(--danger); }
+  .tabs { display:flex; gap:6px; padding:12px 24px 0; flex-wrap:wrap; }
+  .tab { background:var(--panel); border:1px solid #37404b; color:var(--muted); border-radius:999px;
+         padding:6px 14px; font-size:13px; cursor:pointer; }
+  .tab.active { background:var(--accent2); color:#fff; border-color:var(--accent2); font-weight:600; }
+  .controls { display:flex; gap:8px; padding:12px 24px; flex-wrap:wrap; align-items:center;
+              background:var(--panel); border-bottom:1px solid #2b3644; }
+  .controls input, .controls select { background:var(--panel2); color:var(--text);
+    border:1px solid #37404b; border-radius:8px; padding:7px 10px; font-size:13px; outline:none; }
+  .toggle { color:var(--muted); font-size:12px; display:inline-flex; align-items:center; gap:5px;
+            cursor:pointer; }
+  .toggle input { accent-color:var(--accent2); }
+  #count { color:var(--muted); font-size:13px; margin-left:auto; }
+  #list { padding:16px 24px; display:flex; flex-direction:column; gap:12px; max-width:1000px; margin:auto; }
+  .job { background:var(--panel); border:1px solid #2b3644; border-radius:12px; padding:14px 16px; }
+  .job.starred { border-color:var(--gold); }
+  .job.applied { border-left:4px solid var(--green); }
+  .job-top { display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
+  .fit { font-size:22px; font-weight:800; color:var(--accent); min-width:44px; }
+  .fit.high { color:var(--green); }
+  .co { font-weight:700; font-size:15px; }
+  .ti { font-size:14px; color:var(--text); flex:1 1 100%; margin-top:2px; }
+  .meta { color:var(--muted); font-size:12px; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; }
+  .chip { background:var(--panel2); border-radius:5px; padding:1px 7px; font-size:11px; color:var(--muted); }
+  .chip.nl { color:var(--green); }
+  .chip.senior { color:var(--gold); }
+  .btns { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+  .btns a, .btns button { background:var(--panel2); border:1px solid #37404b; color:var(--text);
+    border-radius:8px; padding:6px 12px; font-size:12.5px; cursor:pointer; text-decoration:none; }
+  .btns .primary { background:var(--accent2); border-color:var(--accent2); color:#fff; font-weight:600; }
+  .btns .applybtn { background:var(--green); border-color:var(--green); color:#06220f; font-weight:700; }
+  .btns button.on { color:var(--gold); border-color:var(--gold); }
+  .btns .danger { color:var(--danger); }
+  .btns select { background:var(--panel2); color:var(--text); border:1px solid #37404b;
+    border-radius:8px; padding:6px 8px; font-size:12.5px; }
+  .reasoning { display:none; background:var(--panel2); border-radius:8px; padding:10px 12px;
+               font-size:12.5px; color:var(--muted); margin-top:10px; white-space:pre-wrap; }
+  .reasoning.open { display:block; }
+  .reasoning b { color:var(--text); }
+  .notes { width:100%; background:var(--panel2); border:1px solid #2b3644; border-radius:8px;
+           color:var(--text); font-size:12px; padding:7px 10px; resize:vertical; outline:none;
+           margin-top:10px; min-height:30px; }
+  .when { color:var(--muted); font-size:12px; }
+  #empty { text-align:center; color:var(--muted); padding:60px; }
+  @media (max-width:640px){ #list{padding:12px} .kpis{display:none} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎯 ApplyBoard</h1>
+  <div class="kpis" id="kpis"></div>
+</header>
+<div class="tabs">
+  <button class="tab active" data-tab="queue">🎯 Aplicar ahora</button>
+  <button class="tab" data-tab="starred">⭐ Favoritas</button>
+  <button class="tab" data-tab="applied">📤 Aplicadas</button>
+  <button class="tab" data-tab="followup">⏰ Follow-ups</button>
+  <button class="tab" data-tab="skipped">🗑 Descartadas</button>
+  <button class="tab" data-tab="all">Todas (fit ≥ 6)</button>
+  <button class="tab" data-tab="templates">📝 Plantillas</button>
+  <button class="tab" data-tab="contacts">🏢 Contactos</button>
+</div>
+<div class="controls">
+  <input id="q" placeholder="Buscar puesto o empresa…" size="24">
+  <select id="minfit">
+    <option value="8">fit ≥ 8</option>
+    <option value="7">fit ≥ 7</option>
+    <option value="9">fit ≥ 9</option>
+    <option value="6">fit ≥ 6</option>
+  </select>
+  <select id="scope">
+    <option value="nl">📍 Países Bajos</option>
+    <option value="nl_remote">NL + Remoto</option>
+    <option value="lu">Luxemburgo</option>
+    <option value="remote">Solo remoto</option>
+    <option value="all">Toda Europa / todas</option>
+  </select>
+  <select id="site"><option value="">Todas las fuentes</option></select>
+  <label class="toggle"><input type="checkbox" id="noDutch" checked> Sin holandés requerido</label>
+  <label class="toggle"><input type="checkbox" id="noSenior" checked> Sin senior/lead</label>
+  <label class="toggle"><input type="checkbox" id="withCv"> Solo con CV listo</label>
+  <span id="count"></span>
+</div>
+<div id="list"></div>
+<div id="templates" style="display:none;padding:16px 24px;max-width:1000px;margin:auto"></div>
+<div id="contacts" style="display:none;padding:16px 24px;max-width:1000px;margin:auto"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+let DATA = [], KPIS = {}, CONTACTS = [], TAB = 'queue';
+const $ = id => document.getElementById(id);
+const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+
+// ---------- capa de datos: Supabase (version online) ----------
+let SB = null;
+
+function sbConfig() {
+  let url = localStorage.getItem('sb_url'), anon = localStorage.getItem('sb_anon');
+  if (!url || !anon) {
+    url = prompt('URL del proyecto Supabase (https://xxxx.supabase.co):');
+    anon = prompt('Clave "anon public" del proyecto:');
+    if (!url || !anon) { document.body.innerHTML = '<p style="padding:40px">Configuracion cancelada. Recarga.</p>'; throw new Error('no config'); }
+    localStorage.setItem('sb_url', url.trim());
+    localStorage.setItem('sb_anon', anon.trim());
+  }
+  return { url: localStorage.getItem('sb_url'), anon: localStorage.getItem('sb_anon') };
+}
+
+function showLogin() {
+  const div = document.createElement('div');
+  div.id = 'loginOverlay';
+  div.style.cssText = 'position:fixed;inset:0;background:var(--bg);z-index:900;display:flex;align-items:center;justify-content:center';
+  div.innerHTML = `<div style="background:var(--panel);padding:30px;border-radius:12px;max-width:340px;width:90%">
+    <h2 style="color:var(--accent);margin-bottom:14px">🎯 ApplyBoard</h2>
+    <input id="liEmail" type="email" placeholder="Email" autocomplete="username"
+      style="width:100%;margin-bottom:8px;background:var(--panel2);color:var(--text);border:1px solid #37404b;border-radius:8px;padding:9px 10px">
+    <input id="liPass" type="password" placeholder="Contraseña" autocomplete="current-password"
+      style="width:100%;margin-bottom:12px;background:var(--panel2);color:var(--text);border:1px solid #37404b;border-radius:8px;padding:9px 10px">
+    <button onclick="doLogin()" style="width:100%;background:var(--accent2);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer">Entrar</button>
+    <p id="liErr" style="color:var(--danger);font-size:12px;margin-top:8px"></p></div>`;
+  document.body.appendChild(div);
+}
+
+async function doLogin() {
+  const { error } = await SB.auth.signInWithPassword({
+    email: document.getElementById('liEmail').value.trim(),
+    password: document.getElementById('liPass').value,
+  });
+  if (error) { document.getElementById('liErr').textContent = 'Error: ' + error.message; return; }
+  document.getElementById('loginOverlay').remove();
+  await fetchAll();
+}
+
+async function fetchAll() {
+  let all = [], from = 0;
+  while (true) {
+    const { data, error } = await SB.from('applyboard_jobs').select('*').range(from, from + 999);
+    if (error) { alert('Error cargando: ' + error.message); return; }
+    all = all.concat(data);
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  DATA = all;
+  const { data: cts } = await SB.from('applyboard_contacts').select('*');
+  CONTACTS = cts || [];
+  const week = new Date(Date.now() - 7 * 86400e3).toISOString();
+  KPIS = {
+    applied: DATA.filter(j => j.applied_at).length,
+    applied_week: DATA.filter(j => j.applied_at && j.applied_at >= week).length,
+    interviews: DATA.filter(j => ['entrevista','en_proceso','oferta'].includes(j.response_status) || (j.carlos_notes || '').includes('ENTREVISTA')).length,
+    waiting: DATA.filter(j => j.applied_at && (!j.response_status || j.response_status === 'sin_respuesta')).length,
+    rejected: DATA.filter(j => j.response_status === 'rechazo').length,
+    queue_nl: DATA.filter(j => (j.fit_score ?? 0) >= 8 && j.is_nl && !j.is_senior && !j.applied_at && j.apply_status !== 'skipped').length,
+  };
+  KPIS.resp_rate = KPIS.applied ? Math.round(100 * KPIS.interviews / KPIS.applied) : 0;
+  renderAll();
+}
+
+function renderAll() {
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="n">${KPIS.applied}</div><div class="l">enviadas</div></div>
+    <div class="kpi"><div class="n">${KPIS.applied_week}</div><div class="l">esta semana</div></div>
+    <div class="kpi good"><div class="n">${KPIS.interviews} · ${KPIS.resp_rate}%</div><div class="l">entrevistas · tasa</div></div>
+    <div class="kpi"><div class="n">${KPIS.waiting}</div><div class="l">esperando</div></div>
+    <div class="kpi bad"><div class="n">${KPIS.rejected}</div><div class="l">rechazos</div></div>
+    <div class="kpi"><div class="n">${KPIS.queue_nl}</div><div class="l">cola NL lista</div></div>`;
+  const sites = [...new Set(DATA.map(j => j.site))].sort();
+  $('site').innerHTML = '<option value="">Todas las fuentes</option>' +
+    sites.map(s => `<option>${esc(s)}</option>`).join('');
+  render();
+}
+
+async function load() {
+  const cfg = sbConfig();
+  SB = supabase.createClient(cfg.url, cfg.anon);
+  const { data: { session } } = await SB.auth.getSession();
+  if (!session) { showLogin(); return; }
+  await fetchAll();
+}
+
+
+function daysAgo(iso) {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400e3);
+}
+
+function visible() {
+  const q = $('q').value.toLowerCase(), minfit = parseInt($('minfit').value),
+        site = $('site').value;
+  let out = DATA.filter(j => {
+    const applied = !!j.applied_at, skipped = j.apply_status === 'skipped';
+    if (TAB === 'queue' && (applied || skipped)) return false;
+    if (TAB === 'starred' && !(j.starred && !applied)) return false;
+    if (TAB === 'applied' && !applied) return false;
+    if (TAB === 'followup') {
+      const d = daysAgo(j.applied_at);
+      if (!(applied && d >= 7 && !j.followup_sent_at &&
+            (!j.response_status || j.response_status === 'sin_respuesta'))) return false;
+    }
+    if (TAB === 'skipped' && !skipped) return false;
+    if (TAB === 'queue' || TAB === 'all') {
+      if ((j.fit_score ?? 0) < minfit) return false;
+      const scope = $('scope').value;
+      if (scope === 'nl' && !j.is_nl) return false;
+      if (scope === 'nl_remote' && !j.is_nl && !j.is_remote) return false;
+      if (scope === 'lu' && !j.is_lu) return false;
+      if (scope === 'remote' && !j.is_remote) return false;
+      if ($('noDutch').checked && j.needs_dutch) return false;
+      if ($('noSenior').checked && j.is_senior) return false;
+      if ($('withCv').checked && !j.cv_exists) return false;
+    }
+    if (site && j.site !== site) return false;
+    if (q && !((j.title || '').toLowerCase().includes(q) || (j.company || '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  if (TAB === 'applied') out.sort((a, b) => (b.applied_at || '').localeCompare(a.applied_at || ''));
+  else if (TAB === 'followup') out.sort((a, b) => (a.applied_at || '').localeCompare(b.applied_at || ''));
+  else out.sort((a, b) => (b.starred - a.starred) || ((b.fit_score ?? 0) - (a.fit_score ?? 0)));
+  return out.slice(0, 150);
+}
+
+const RESP_OPTS = ['sin_respuesta', 'entrevista', 'en_proceso', 'oferta', 'rechazo'];
+
+function card(j) {
+  const applied = !!j.applied_at;
+  const url = j.application_url || j.url;
+  const external = !String(url).startsWith('email:') && !String(url).startsWith('outreach:');
+  const d = daysAgo(j.applied_at);
+  let respSel = '';
+  if (applied) {
+    respSel = `<select onchange="update(${j.rowid}, {response_status: this.value})">` +
+      RESP_OPTS.map(o => `<option ${((j.response_status || 'sin_respuesta') === o) ? 'selected' : ''}>${o}</option>`).join('') +
+      '</select>' +
+      `<button onclick="copyTemplateFor(${j.rowid}, 'fu_applied', this)">📋 Follow-up</button>` +
+      (j.followup_sent_at ? '<span class="chip">follow-up ✓</span>'
+        : `<button onclick="update(${j.rowid}, {followup_sent_at: 'now'})">⏰ follow-up hecho</button>`);
+  } else {
+    respSel = `<button onclick="copyTemplateFor(${j.rowid}, 'li_connect', this)" title="Copiar mensaje de conexión LinkedIn">🔗 LinkedIn</button>`;
+  }
+  return `<div class="job ${j.starred ? 'starred' : ''} ${applied ? 'applied' : ''}">
+    <div class="job-top">
+      <span class="fit ${(j.fit_score ?? 0) >= 9 ? 'high' : ''}">${j.fit_score ?? '–'}</span>
+      <span class="co">${j.starred ? '⭐ ' : ''}${esc(j.company || j.site)}</span>
+      ${applied ? `<span class="when">aplicada ${j.applied_at.slice(0, 10)} · hace ${d}d</span>` : ''}
+    </div>
+    <div class="ti">${esc(j.title)}</div>
+    <div class="meta">
+      <span>📍 ${esc((j.location || '?').split(',').slice(0, 2).join(','))}</span>
+      <span class="chip">${esc(j.site)}</span>
+      ${j.is_nl ? '<span class="chip nl">NL</span>' : ''}
+      ${j.is_lu ? '<span class="chip nl">LU</span>' : ''}
+      ${j.is_remote ? '<span class="chip">remoto</span>' : ''}
+      ${j.needs_dutch ? '<span class="chip senior">🇳🇱 pide holandés</span>' : ''}
+      ${j.is_senior ? '<span class="chip senior">senior/lead</span>' : ''}
+      ${j.easy_apply ? '<span class="chip">easy apply</span>' : ''}
+      ${j.cv_exists ? '<span class="chip nl">CV listo</span>' : ''}
+      ${j.cl_exists ? '<span class="chip nl">carta lista</span>' : ''}
+    </div>
+    <div class="btns">
+      ${external ? `<a class="primary" href="${esc(url)}" target="_blank" rel="noopener">🔗 Abrir oferta</a>`
+                  : `<span class="chip">${esc(url)}</span>`}
+      ${j.cv_exists ? `<button onclick="openFile(${j.rowid}, 'cv')">📄 CV adaptado</button>` : ''}
+      ${j.cl_exists ? `<button onclick="openFile(${j.rowid}, 'cl')">✉️ Carta</button>` : ''}
+      <button onclick="this.closest('.job').querySelector('.reasoning').classList.toggle('open')">🧠 Por qué encaja</button>
+      <button class="${j.starred ? 'on' : ''}" onclick="update(${j.rowid}, {starred: ${j.starred ? 0 : 1}})">⭐</button>
+      ${!applied ? `<button class="applybtn" onclick="if(confirm('¿Marcar como APLICADA?')) update(${j.rowid}, {applied_at: 'now', apply_status: 'applied'})">✅ Aplicada</button>` : ''}
+      ${!applied ? `<button class="danger" onclick="update(${j.rowid}, {apply_status: ${j.apply_status === 'skipped' ? 'null' : "'skipped'"}})">${j.apply_status === 'skipped' ? '↩ Recuperar' : '🗑 Descartar'}</button>` : ''}
+      ${respSel}
+    </div>
+    <div class="reasoning"><b>Razonamiento del score:</b>
+${esc(j.score_reasoning || 'sin datos')}
+
+<b>Descripción (extracto):</b>
+${esc((j.descr || '').slice(0, 900))}</div>
+    <textarea class="notes" placeholder="Notas (se guardan solas)…"
+      onchange="update(${j.rowid}, {carlos_notes: this.value}, true)">${esc(j.carlos_notes)}</textarea>
+  </div>`;
+}
+
+// ---------- plantillas (centro de control de outreach) ----------
+const TEMPLATES = [
+  { id: 'fu_applied', title: '⏰ Follow-up tras aplicar (7-10 días sin respuesta)', body:
+`Subject: Following up – {role} application | Carlos Dorronsoro
+
+Hi {name},
+
+I applied for the {role} position at {company} about a week ago and wanted to reiterate my interest. Two things that might be relevant:
+
+- I'm relocating to the Netherlands on August 20th (no visa needed, EU citizen), so I'll be fully available locally.
+- At PwC I work on AI transformation for banking/insurance clients — last year I built and deployed an end-to-end AI agent for Spain's largest insurer.
+
+I'd love the chance to show how that experience maps to what {company} is building. Happy to share more or jump on a quick call.
+
+Best regards,
+Carlos Dorronsoro Málaga
+carlosdorronsoromalaga.com` },
+  { id: 'fu_interview', title: '🎤 Follow-up tras entrevista (3-5 días)', body:
+`Subject: Following up – {role} | Carlos Dorronsoro
+
+Hi {name},
+
+I wanted to thank you again for the conversation about the {role} position. It reinforced my conviction that this is a strong match: [MENCIONA ALGO CONCRETO DE LA ENTREVISTA].
+
+If there's any additional information I can provide to support the decision, I'm happy to share it. Looking forward to hearing about the next steps.
+
+Best regards,
+Carlos` },
+  { id: 'li_connect', title: '🔗 LinkedIn: solicitud de conexión a recruiter (máx 300 chars)', body:
+`Hi {name}, I applied for the {role} role at {company}. Consultant at PwC (banking/insurance) pivoting to AI — built an end-to-end AI agent for Spain's largest insurer. Relocating to NL on Aug 20. Would love to connect!` },
+  { id: 'li_message', title: '💬 LinkedIn: mensaje tras conectar', body:
+`Hi {name}, thanks for connecting!
+
+I recently applied for the {role} position at {company} and wanted to reach out directly. My background: strategy consulting at PwC (banking & insurance) + hands-on AI work — I designed and shipped an AI agent end-to-end for Spain's largest insurer, from architecture to stakeholder rollout.
+
+I'm relocating to the Netherlands on August 20th (EU citizen, no sponsorship needed). If you think there's a fit, I'd love a quick chat. Either way, happy to be connected!
+
+Carlos` },
+  { id: 'cold_hm', title: '🚪 Puerta fría a hiring manager / founder', body:
+`Subject: AI adoption background, relocating to Amsterdam
+
+Hi {name},
+
+I'll be direct: I'm moving to the Netherlands on August 20th and {company} is one of the companies I genuinely admire in the AI space.
+
+I work as a transformation consultant at PwC Madrid (banking & insurance). Last year I built an AI agent for Spain's largest insurer end to end: architecture, stakeholder management, deciding when the system acts autonomously versus escalating. I also build and ship my own AI products (carlosdorronsoromalaga.com).
+
+I don't know if you're hiring for something like this right now — but if the problems above sound familiar, I'd love 20 minutes of your time.
+
+Best,
+Carlos Dorronsoro Málaga` },
+  { id: 'rejection_door', title: '🌱 Respuesta a rechazo (dejar puerta abierta)', body:
+`Hi {name},
+
+Thank you for letting me know, and for the time you invested in the process. I really enjoyed learning about {company} and how the team works.
+
+I'd genuinely appreciate it if you kept me in mind for future openings — especially once I'm based in the Netherlands from August 20th. In the meantime, I'd welcome any feedback from the process; it's always valuable.
+
+Wishing you and the team all the best,
+Carlos` },
+  { id: 'relocation_update', title: '📦 Aviso de mudanza (reabrir proceso descartado por ubicación)', body:
+`Subject: Update on my situation – {role} | Carlos Dorronsoro
+
+Hi {name},
+
+I wanted to share one update that might change things: as of August 20th I will be based in the Netherlands (EU citizen, no visa or sponsorship needed).
+
+If local presence was a factor in the decision on my {role} application, I'd love to be reconsidered — I remain very interested in {company}.
+
+Best regards,
+Carlos` },
+];
+
+function fillTemplate(body, j) {
+  return body
+    .replaceAll('{company}', j?.company || j?.site || '[EMPRESA]')
+    .replaceAll('{role}', j?.title || '[PUESTO]')
+    .replaceAll('{name}', '[NOMBRE]');
+}
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const old = btn.textContent;
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => btn.textContent = old, 1500);
+  });
+}
+
+function copyTemplateFor(rowid, tplId, btn) {
+  const j = DATA.find(x => x.rowid === rowid);
+  const tpl = TEMPLATES.find(t => t.id === tplId);
+  copyText(fillTemplate(tpl.body, j), btn);
+}
+
+function renderTemplates() {
+  $('templates').innerHTML = '<p style="color:var(--muted);font-size:13px;margin-bottom:14px">' +
+    'Haz clic en 📋 para copiar. Los huecos {company}/{role} se rellenan solos si copias desde ' +
+    'una oferta (botón 📋 Follow-up en las tarjetas); desde aquí se copian con marcadores. ' +
+    'Revisa siempre [NOMBRE] y los corchetes antes de enviar.</p>' +
+    TEMPLATES.map(t => `
+    <div class="job" style="margin-bottom:12px">
+      <div class="job-top"><span class="co">${t.title}</span>
+        <button style="margin-left:auto;background:var(--panel2);border:1px solid #37404b;color:var(--text);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer"
+          onclick="copyText(TEMPLATES.find(x=>x.id==='${t.id}').body, this)">📋 Copiar</button>
+      </div>
+      <pre style="white-space:pre-wrap;font-family:inherit;font-size:12.5px;color:var(--muted);margin-top:10px">${esc(t.body)}</pre>
+    </div>`).join('');
+}
+
+// ---------- contactos (puerta fria) ----------
+const C_STATUS = ['por_contactar', 'contactado', 'respondio', 'reunion', 'descartado'];
+const C_LABEL = {por_contactar: '📥 Por contactar', contactado: '📤 Contactado',
+                 respondio: '💬 Respondió', reunion: '🤝 Reunión', descartado: '🗑'};
+
+function emailPatterns(name, domain) {
+  const parts = name.toLowerCase().trim().split(/\s+/).filter(x => x);
+  if (!parts.length || !domain) return [];
+  const [first, last] = [parts[0], parts[parts.length - 1]];
+  const out = [`${first}.${last}@${domain}`, `${first}@${domain}`,
+               `${first[0]}${last}@${domain}`, `${first[0]}.${last}@${domain}`,
+               `${first}${last[0]}@${domain}`, `${last}@${domain}`];
+  return [...new Set(out)];
+}
+
+function contactCard(c) {
+  const mailto = c.email ? `<a href="mailto:${esc(c.email)}" style="color:var(--accent)">${esc(c.email)}</a>` : '<span style="color:var(--muted)">sin email</span>';
+  const li = c.linkedin ? ` · <a href="${esc(c.linkedin)}" target="_blank" style="color:var(--accent)">LinkedIn</a>` : '';
+  return `<div class="job" style="margin-bottom:10px">
+    <div class="job-top">
+      <span class="co">${esc(c.company)}</span>
+      <span style="color:var(--muted);font-size:13px">${esc(c.name || '')} ${c.role ? '· ' + esc(c.role) : ''}</span>
+      <span style="margin-left:auto"><select onchange="updateContact('${c.uid}', {status: this.value})">
+        ${C_STATUS.map(s => `<option value="${s}" ${c.status === s ? 'selected' : ''}>${C_LABEL[s]}</option>`).join('')}
+      </select></span>
+    </div>
+    <div class="meta" style="margin-top:6px">${mailto}${li}
+      ${c.last_contacted_at ? ` · último contacto ${c.last_contacted_at.slice(0, 10)}` : ''}
+      · <span class="chip">${esc(c.source || '')}</span></div>
+    <div class="btns">
+      <button onclick="copyColdFor('${c.uid}', this)">📋 Copiar puerta fría</button>
+      <button onclick="updateContact('${c.uid}', {last_contacted_at: 'now', status: 'contactado'})">📤 Marcar contactado</button>
+    </div>
+    <textarea class="notes" placeholder="Notas…" onchange="updateContact('${c.uid}', {notes: this.value}, true)">${esc(c.notes)}</textarea>
+  </div>`;
+}
+
+function renderContacts() {
+  const finder = `
+  <div class="job" style="margin-bottom:14px;border-color:var(--accent2)">
+    <div class="co" style="margin-bottom:8px">🔎 Encontrar el email de alguien</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="epName" placeholder="Nombre Apellido" style="background:var(--panel2);color:var(--text);border:1px solid #37404b;border-radius:8px;padding:7px 10px">
+      <input id="epDomain" placeholder="empresa.com" style="background:var(--panel2);color:var(--text);border:1px solid #37404b;border-radius:8px;padding:7px 10px">
+      <button style="background:var(--accent2);color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer"
+        onclick="$('epOut').innerHTML = emailPatterns($('epName').value, $('epDomain').value).map(e => '<span class=chip style=cursor:pointer onclick=copyText(this.textContent,this)>' + e + '</span>').join(' ') || 'Rellena nombre y dominio'">Generar patrones</button>
+    </div>
+    <div id="epOut" style="margin-top:8px"></div>
+    <div class="meta" style="margin-top:8px">Los patrones más comunes en NL son nombre.apellido@ y n.apellido@. Para verificar sin enviar:
+      <a href="https://hunter.io/email-finder" target="_blank" style="color:var(--accent)">hunter.io</a> (25 búsquedas/mes gratis) ·
+      <a href="https://www.linkedin.com/sales/gmail/profile-viewer" target="_blank" style="color:var(--accent)">LinkedIn</a> ·
+      truco: la página de "team" o notas de prensa de la empresa suelen revelar el patrón.</div>
+  </div>
+  <div class="job" style="margin-bottom:14px">
+    <div class="co" style="margin-bottom:8px">➕ Añadir contacto</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="cCompany" placeholder="Empresa *" style="background:var(--panel2);color:var(--text);border:1px solid #37404b;border-radius:8px;padding:7px 10px">
+      <input id="cName" placeholder="Nombre" style="background:var(--panel2);color:var(--text);border:1px solid #37404b;border-radius:8px;padding:7px 10px">
+      <input id="cRole" placeholder="Cargo" style="background:var(--panel2);color:var(--text);border:1px solid #37404b;border-radius:8px;padding:7px 10px">
+      <input id="cEmail" placeholder="Email" style="background:var(--panel2);color:var(--text);border:1px solid #37404b;border-radius:8px;padding:7px 10px">
+      <input id="cLinkedin" placeholder="URL LinkedIn" style="background:var(--panel2);color:var(--text);border:1px solid #37404b;border-radius:8px;padding:7px 10px">
+      <button style="background:var(--green);color:#06220f;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer" onclick="addContact()">Guardar</button>
+    </div>
+  </div>`;
+  const groups = C_STATUS.map(s => {
+    const items = CONTACTS.filter(c => c.status === s);
+    if (!items.length) return '';
+    return `<h3 style="color:var(--muted);font-size:13px;margin:16px 0 8px">${C_LABEL[s]} (${items.length})</h3>` +
+      items.map(contactCard).join('');
+  }).join('');
+  $('contacts').innerHTML = finder + groups;
+}
+
+async function addContact() {
+  const body = { company: $('cCompany').value.trim(), name: $('cName').value.trim(),
+    role: $('cRole').value.trim(), email: $('cEmail').value.trim(),
+    linkedin: $('cLinkedin').value.trim() };
+  if (!body.company) { alert('La empresa es obligatoria'); return; }
+  await apiContactAdd(body);
+  await load();
+  document.querySelector('.tab[data-tab=contacts]').click();
+}
+
+async function updateContact(uid, fields, silent) {
+  const res = await apiContactUpdate(uid, fields);
+  const c = CONTACTS.find(x => x.uid === uid);
+  if (c && res) Object.assign(c, res);
+  if (!silent) renderContacts();
+}
+
+function copyColdFor(uid, btn) {
+  const c = CONTACTS.find(x => x.uid === uid);
+  const tpl = TEMPLATES.find(t => t.id === 'cold_hm');
+  const text = tpl.body.replaceAll('{company}', c.company)
+    .replaceAll('{name}', c.name || '[NOMBRE]').replaceAll('{role}', '[PUESTO]');
+  copyText(text, btn);
+}
+
+function render() {
+  const isTpl = TAB === 'templates', isContacts = TAB === 'contacts';
+  $('templates').style.display = isTpl ? 'block' : 'none';
+  $('contacts').style.display = isContacts ? 'block' : 'none';
+  $('list').style.display = (isTpl || isContacts) ? 'none' : 'flex';
+  if (isTpl) { renderTemplates(); $('count').textContent = ''; return; }
+  if (isContacts) { renderContacts(); $('count').textContent = CONTACTS.length + ' contactos'; return; }
+  const items = visible();
+  $('count').textContent = items.length + ' ofertas';
+  $('list').innerHTML = items.length ? items.map(card).join('')
+    : '<div id="empty">Nada aquí con estos filtros.</div>';
+}
+
+
+async function update(rowid, fields, silent) {
+  const j = DATA.find(x => x.rowid === rowid);
+  if (!j) return;
+  const now = new Date().toISOString();
+  const clean = {};
+  for (const [k, v] of Object.entries(fields))
+    clean[k] = v === 'now' ? now : (v === 'null' ? null : v);
+  const { error } = await SB.from('applyboard_jobs').update(clean).eq('url', j.url);
+  if (error) { alert('No guardado: ' + error.message); return; }
+  Object.assign(j, clean);
+  if (!silent) render();
+}
+
+async function refreshKpis() { /* recalculado en fetchAll; no-op online */ }
+
+async function openFile(rowid, kind) {
+  alert('Los ficheros de CV/carta viven en el PC de casa — este boton solo funciona alli.
+' +
+        'El chip "CV listo" te confirma que existe; puedes regenerarlo con prep_one.py.');
+}
+
+async function apiContactAdd(body) {
+  const uid = Math.random().toString(36).slice(2, 10);
+  const { error } = await SB.from('applyboard_contacts').insert({ ...body, uid, source: 'web' });
+  if (error) { alert('Error: ' + error.message); return false; }
+  return true;
+}
+
+async function apiContactUpdate(uid, fields) {
+  const now = new Date().toISOString();
+  if (fields.last_contacted_at === 'now') fields.last_contacted_at = now;
+  const { data, error } = await SB.from('applyboard_contacts').update(fields).eq('uid', uid).select();
+  if (error) { alert('No guardado: ' + error.message); return null; }
+  return data && data[0];
+}
+
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  TAB = t.dataset.tab;
+  render();
+});
+['q', 'minfit', 'site', 'scope', 'noDutch', 'noSenior', 'withCv'].forEach(id =>
+  $(id).addEventListener('input', render));
+
+load();
+</script>
+</body>
+</html>
