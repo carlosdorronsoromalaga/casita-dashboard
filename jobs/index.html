@@ -115,16 +115,10 @@ const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 // ---------- capa de datos: Supabase (version online) ----------
 let SB = null;
 
+// Configuracion incrustada en build (la clave publishable es publica por
+// diseno; la seguridad la dan el login + RLS en el servidor).
 function sbConfig() {
-  let url = localStorage.getItem('sb_url'), anon = localStorage.getItem('sb_anon');
-  if (!url || !anon) {
-    url = prompt('URL del proyecto Supabase (https://xxxx.supabase.co):');
-    anon = prompt('Clave "anon public" del proyecto:');
-    if (!url || !anon) { document.body.innerHTML = '<p style="padding:40px">Configuracion cancelada. Recarga.</p>'; throw new Error('no config'); }
-    localStorage.setItem('sb_url', url.trim());
-    localStorage.setItem('sb_anon', anon.trim());
-  }
-  return { url: localStorage.getItem('sb_url'), anon: localStorage.getItem('sb_anon') };
+  return { url: 'https://wzikfazbfgtxljtkkphm.supabase.co', anon: 'sb_publishable_pMmT_8oxKBcqU-fD_4yTqA_YKNVm6jN' };
 }
 
 function showLogin() {

@@ -243,16 +243,12 @@ function afterLoad() {
 // ---------- capa de datos: Supabase (version online) ----------
 let SB = null;
 
+// Configuracion incrustada en build (la clave publishable es publica por
+// diseno; la seguridad real la dan el login y las politicas RLS del servidor).
+// Antes se pedia por prompt() y se guardaba en localStorage: fragil (valores
+// viejos pegados, prompts bloqueados, errores al pegar).
 function sbConfig() {
-  let url = localStorage.getItem('sb_url'), anon = localStorage.getItem('sb_anon');
-  if (!url || !anon) {
-    url = prompt('URL del proyecto Supabase (https://xxxx.supabase.co):');
-    anon = prompt('Clave "anon public" del proyecto (esta en SETUP_ONLINE.md):');
-    if (!url || !anon) { document.body.innerHTML = '<p style="padding:40px">Configuracion cancelada. Recarga la pagina.</p>'; throw new Error('no config'); }
-    localStorage.setItem('sb_url', url.trim());
-    localStorage.setItem('sb_anon', anon.trim());
-  }
-  return { url: localStorage.getItem('sb_url'), anon: localStorage.getItem('sb_anon') };
+  return { url: 'https://wzikfazbfgtxljtkkphm.supabase.co', anon: 'sb_publishable_pMmT_8oxKBcqU-fD_4yTqA_YKNVm6jN' };
 }
 
 function showLogin() {
@@ -300,6 +296,258 @@ async function load() {
   if (!session) { showLogin(); return; }
   await fetchAll();
 }
+
+
+function perM2(l) { return l.price_eur && l.size_m2 ? l.price_eur / l.size_m2 : null; }
+function isChollo(l) { return l.deal_score != null && l.deal_score >= CONFIG.deal_chollo
+                        && l.trust !== 'possible_scam' && !l.auto_excluded; }
+
+function visible() {
+  const q = $('q').value.toLowerCase(), city = $('city').value,
+        pmax = parseFloat($('pmax').value) || null, m2min = parseFloat($('m2min').value) || null,
+        ptype = $('ptype').value, portal = $('portal').value,
+        furn = $('furn').value, trustf = $('trustf').value;
+  const now = Date.now();
+  let out = DATA.filter(l => {
+    if (TAB !== 'all' && l.auto_excluded) return false;
+    if (TAB === 'active' && (!l.active || l.status === 'discarded')) return false;
+    if (TAB === 'new48') {
+      if (!l.active || l.status === 'discarded') return false;
+      if (now - new Date(l.first_seen).getTime() > 48 * 3600e3) return false;
+    }
+    if (TAB === 'chollos' && !(isChollo(l) && l.active && l.status !== 'discarded')) return false;
+    if (TAB === 'favorite' && l.status !== 'favorite') return false;
+    if (TAB === 'contacted' && l.status !== 'contacted') return false;
+    if (TAB === 'discarded' && l.status !== 'discarded') return false;
+    if (q && !(l.title.toLowerCase().includes(q) || l.city.toLowerCase().includes(q))) return false;
+    if (city && l.city !== city) return false;
+    if (pmax != null && (l.price_eur == null || l.price_eur > pmax)) return false;
+    if (m2min != null && (l.size_m2 == null || l.size_m2 < m2min)) return false;
+    if (ptype && l.property_type !== ptype) return false;
+    if (portal && l.portal !== portal) return false;
+    if (furn && l.furnished !== furn) return false;
+    if (trustf && l.trust !== trustf) return false;
+    if ($('outdoorF').checked && !l.outdoor) return false;
+    if ($('noStudent').checked && l.student_only === 1) return false;
+    if ($('noTemp').checked && l.temporary === 1) return false;
+    if ($('couple').checked && l.max_persons != null && l.max_persons < 2) return false;
+    return true;
+  });
+  const sort = $('sort').value;
+  const key = {
+    newest: l => -new Date(l.first_seen).getTime(),
+    deal: l => -(l.deal_score ?? -1),
+    price: l => l.price_eur ?? 1e9,
+    priceDesc: l => -(l.price_eur ?? 0),
+    perm2: l => perM2(l) ?? 1e9,
+    size: l => -(l.size_m2 ?? 0),
+  }[sort];
+  out.sort((a, b) => key(a) - key(b));
+  return out;
+}
+
+const DET_LABELS = {
+  deposit_eur: v => `Depósito: ${fmt(v)} €`,
+  deposit_months: v => `Depósito: ${v} mes(es) de renta`,
+  available_text: v => `Entrada: ${v}`,
+  min_duration_months: v => `Contrato mínimo: ${v} meses`,
+  income_requirement: v => `Requisito de ingresos: ${v}`,
+  registration: v => v === 'yes' ? 'Empadronamiento (inschrijving): ✅ posible' : 'Empadronamiento: ❌ NO posible',
+  service_costs_eur: v => `Gastos de servicio: ${fmt(v)} €/mes`,
+  upfront: v => `Por adelantado: ${v}`,
+};
+
+function fichaHTML(l) {
+  let parts = [];
+  if (l._details && Object.keys(l._details).length) {
+    parts.push('<h4>📋 Condiciones (de la página del anuncio)</h4><ul>' +
+      Object.entries(l._details).map(([k, v]) => `<li>${(DET_LABELS[k] || (x => k + ': ' + x))(v)}</li>`).join('') + '</ul>');
+  } else if (l.enriched_at) {
+    parts.push('<h4>📋 Condiciones</h4><p>No se encontraron condiciones explícitas en el anuncio — preguntar al contactar: depósito, meses por adelantado, duración mínima y si el empadronamiento es posible.</p>');
+  } else {
+    parts.push('<h4>📋 Condiciones</h4><p>Ficha aún no descargada (se enriquece en el próximo rastreo).</p>');
+  }
+  if (l._reasons.length) {
+    parts.push(`<h4>🔥 Deal score ${l.deal_score?.toFixed(0)}/100</h4><ul>` +
+      l._reasons.map(r => `<li>${r}</li>`).join('') + '</ul>');
+  }
+  if (l.trust_reason) parts.push(`<h4>⚠ Confianza</h4><p>${l.trust_reason}</p>`);
+  if (l.auto_excluded_reason) parts.push(`<h4>🚫 Excluido automáticamente</h4><p>${l.auto_excluded_reason}</p>`);
+  return parts.join('');
+}
+
+const OUTDOOR_ES = {balcony: 'balcón', terrace: 'terraza', garden: 'jardín'};
+
+function card(l) {
+  const isNew = Date.now() - new Date(l.first_seen).getTime() < 48 * 3600e3;
+  const pm2 = perM2(l);
+  const typeES = {apartment:'Apartamento', studio:'Estudio', house:'Casa', room:'Habitación', unknown:''}[l.property_type] || '';
+  const outdoorTxt = l.outdoor ? l.outdoor.split(',').map(o => OUTDOOR_ES[o] || o).join(', ') : '';
+  const trustCls = l.trust === 'possible_scam' ? 'warn-scam' : (l.trust === 'needs_check' ? 'warn-check' : '');
+  let banner = '';
+  if (l.trust === 'possible_scam') banner = `<div class="banner scam" title="${l.trust_reason || ''}">🚨 POSIBLE ESTAFA — ${(l.trust_reason || '').startsWith('precio') ? 'precio anómalo' : 'criterio propio (no por precio)'}</div>`;
+  else if (l.trust === 'needs_check') banner = '<div class="banner check">⚠ REQUIERE COMPROBACIÓN HUMANA</div>';
+  return `<div class="card ${l.status === 'favorite' ? 'fav' : ''} ${l.status === 'contacted' ? 'contacted' : ''} ${trustCls} ${l.auto_excluded ? 'excluded' : ''}" data-id="${l.id}">
+    ${banner}
+    <div class="imgwrap">
+      ${l.image_url ? `<img src="${l.image_url}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=noimg>🏠</div>'">`
+                     : '<div class="noimg">🏠</div>'}
+      ${isNew ? '<span class="badge new">NUEVO</span>' : ''}
+      ${!l.active ? '<span class="badge">retirado</span>' : ''}
+      ${isChollo(l) ? `<span class="badge deal">🔥 ${l.deal_score.toFixed(0)}</span>` : ''}
+      <span class="badge right">${l.portal}</span>
+    </div>
+    <div class="body">
+      <div class="price">${fmt(l.price_eur)} € <small>/mes${l.price_type === 'all_in' ? ' (gastos incl.)' : ''}</small></div>
+      <div class="title"><a href="${l.url}" target="_blank" rel="noopener">${l.title}</a></div>
+      <div class="meta">📍 ${l.city}
+        ${l.size_m2 ? ' · ' + fmt(l.size_m2) + ' m²' : ''}
+        ${pm2 ? ' · ' + pm2.toFixed(1) + ' €/m²' : ''}
+        ${l.rooms ? ' · ' + l.rooms + ' hab.' : ''}</div>
+      <div class="meta" style="margin-top:6px">
+        ${typeES ? `<span class="chip">${typeES}</span>` : ''}
+        ${l.furnished ? `<span class="chip">${{furnished:'Amueblado', upholstered:'Semi', unfurnished:'Sin muebles'}[l.furnished] || ''}</span>` : ''}
+        ${outdoorTxt ? `<span class="chip" style="color:var(--accent)">🌿 ${outdoorTxt}</span>` : ''}
+        ${l.student_only === 1 ? '<span class="chip warn">🎓 solo estudiantes</span>' : ''}
+        ${l.temporary === 1 ? '<span class="chip warn">⏳ temporal</span>' : ''}
+        ${l.max_persons != null && l.max_persons < 2 ? '<span class="chip warn">👤 solo 1 persona</span>' : ''}
+        ${l.auto_excluded ? `<span class="chip gray" title="${l.auto_excluded_reason || ''}">🚫 auto-excluido</span>` : ''}
+        <span class="chip" style="cursor:pointer" onclick="this.closest('.card').querySelector('.ficha').classList.toggle('open')">📋 ficha</span>
+      </div>
+    </div>
+    <div class="ficha">${fichaHTML(l)}</div>
+    <div class="actions">
+      <button title="Favorito" class="${l.status === 'favorite' ? 'on-fav' : ''}"
+        onclick="setStatus('${l.id}', '${l.status === 'favorite' ? 'seen' : 'favorite'}')">⭐</button>
+      <button title="Contactado" class="${l.status === 'contacted' ? 'on-contact' : ''}"
+        onclick="setStatus('${l.id}', '${l.status === 'contacted' ? 'seen' : 'contacted'}')">✉️</button>
+      <button title="Descartar" class="${l.status === 'discarded' ? 'on-discard' : ''}"
+        onclick="setStatus('${l.id}', '${l.status === 'discarded' ? 'seen' : 'discarded'}')">🗑</button>
+      <button title="Comparar" class="${COMPARE.has(l.id) ? 'on-compare' : ''}"
+        onclick="toggleCompare('${l.id}')">⚖</button>
+    </div>
+    <textarea class="notes" rows="1" placeholder="Notas (se guardan solas)…"
+      onchange="setNotes('${l.id}', this.value)">${l.notes || ''}</textarea>
+  </div>`;
+}
+
+function render() {
+  const isMap = TAB === 'map';
+  $('grid').style.display = isMap ? 'none' : 'grid';
+  $('map').style.display = isMap ? 'block' : 'none';
+  if (isMap) { renderMap(); $('count').textContent = ''; return; }
+  const items = visible();
+  $('count').textContent = items.length + ' anuncios';
+  $('grid').innerHTML = items.length
+    ? items.map(card).join('')
+    : '<div id="empty">Sin resultados con estos filtros.</div>';
+}
+
+// ---------- mapa ----------
+function renderMap() {
+  const saveTab = TAB; TAB = 'active';        // el mapa agrega lo visible en "Activos"
+  const items = visible(); TAB = saveTab;
+  if (!MAP) {
+    MAP = L.map('map').setView([52.15, 5.3], 8);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { attribution: '© OpenStreetMap' }).addTo(MAP);
+    MAPLAYER = L.layerGroup().addTo(MAP);
+  }
+  setTimeout(() => MAP.invalidateSize(), 100);
+  MAPLAYER.clearLayers();
+  const byCity = {};
+  items.forEach(l => { (byCity[l.city] = byCity[l.city] || []).push(l); });
+  Object.entries(byCity).forEach(([city, ls]) => {
+    const coords = CITY_COORDS[city];
+    if (!coords) return;
+    const prices = ls.map(l => l.price_eur).filter(p => p).sort((a, b) => a - b);
+    const minP = prices[0], medP = prices[Math.floor(prices.length / 2)];
+    const chollos = ls.filter(isChollo).length;
+    const m = L.circleMarker(coords, {
+      radius: Math.min(26, 7 + Math.sqrt(ls.length) * 3),
+      fillColor: chollos ? '#4ade80' : '#60a5fa', fillOpacity: .75, color: '#0f1419', weight: 2,
+    }).addTo(MAPLAYER);
+    m.bindTooltip(`<b>${city}</b>: ${ls.length}`, { direction: 'top' });
+    m.bindPopup(`<b>${city}</b><br>${ls.length} anuncios activos<br>` +
+      (minP ? `Desde <b>${fmt(minP)} €</b> · mediana ${fmt(medP)} €<br>` : '') +
+      (chollos ? `🔥 ${chollos} chollos<br>` : '') +
+      `<a href="#" onclick="filterCity('${city}');return false">Ver anuncios →</a>`);
+  });
+}
+function filterCity(city) {
+  $('city').value = city;
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelector('.tab[data-tab=active]').classList.add('active');
+  TAB = 'active';
+  render();
+}
+
+// ---------- comparador ----------
+function toggleCompare(id) {
+  if (COMPARE.has(id)) COMPARE.delete(id);
+  else if (COMPARE.size >= 4) { alert('Máximo 4 anuncios a comparar'); return; }
+  else COMPARE.add(id);
+  $('comparebar').style.display = COMPARE.size ? 'flex' : 'none';
+  $('compareinfo').textContent = `${COMPARE.size} anuncio(s) seleccionado(s)`;
+  render();
+}
+function clearCompare() { COMPARE.clear(); $('comparebar').style.display = 'none'; render(); }
+
+function prosCons(l, others) {
+  const pros = [], cons = [];
+  const cheapest = others.every(o => o.price_eur == null || (l.price_eur != null && l.price_eur <= o.price_eur));
+  const biggest = others.every(o => o.size_m2 == null || (l.size_m2 != null && l.size_m2 >= o.size_m2));
+  const bestPm2 = others.every(o => perM2(o) == null || (perM2(l) != null && perM2(l) <= perM2(o)));
+  if (l.price_eur != null && cheapest && others.length) pros.push('El más barato de la comparación');
+  if (l.size_m2 != null && biggest && others.length) pros.push('El más grande');
+  if (perM2(l) != null && bestPm2 && others.length) pros.push('Mejor €/m²');
+  if (['apartment','house','studio'].includes(l.property_type)) pros.push('Vivienda entera'); else if (l.property_type === 'room') cons.push('Habitación (compartir casa)');
+  if (l.furnished === 'furnished') pros.push('Amueblado'); else if (l.furnished === 'unfurnished') cons.push('Sin amueblar (coste inicial en muebles)');
+  if (l.outdoor) pros.push('Espacio exterior: ' + l.outdoor.split(',').map(o => OUTDOOR_ES[o] || o).join(', '));
+  if (l.price_type === 'all_in') pros.push('Gastos incluidos');
+  if (l.trust === 'verified') pros.push('Portal verificado');
+  if (l.trust === 'needs_check') cons.push('⚠ Requiere comprobación (particular)');
+  if (l.trust === 'possible_scam') cons.push('🚨 Posible estafa: ' + (l.trust_reason || ''));
+  if (l._details?.registration === 'no') cons.push('❌ Sin empadronamiento posible');
+  if (l._details?.registration === 'yes') pros.push('✅ Empadronamiento posible');
+  if (l._details?.deposit_months >= 2 || l._details?.deposit_eur >= 3000) cons.push('Depósito alto');
+  if (l.temporary === 1) cons.push('Contrato temporal');
+  if (l.student_only === 1) cons.push('Solo estudiantes');
+  return { pros, cons };
+}
+
+function openCompare() {
+  const sel = DATA.filter(l => COMPARE.has(l.id));
+  if (sel.length < 2) { alert('Selecciona al menos 2 anuncios con ⚖'); return; }
+  const best = fn => { const vals = sel.map(fn); const ok = vals.filter(v => v != null); return ok.length ? Math.min(...ok) : null; };
+  const bestPrice = best(l => l.price_eur), bestPm2v = best(l => perM2(l));
+  const maxSize = Math.max(...sel.map(l => l.size_m2 ?? -1)), maxDeal = Math.max(...sel.map(l => l.deal_score ?? -1));
+  const row = (label, fn, bestTest) => `<tr><th>${label}</th>` +
+    sel.map(l => `<td class="${bestTest && bestTest(l) ? 'best' : ''}">${fn(l)}</td>`).join('') + '</tr>';
+  let html = '<table class="cmp"><tr><th></th>' +
+    sel.map(l => `<td>${l.image_url ? `<img src="${l.image_url}">` : '🏠'}<br><a href="${l.url}" target="_blank"><b>${l.title.slice(0, 60)}</b></a></td>`).join('') + '</tr>';
+  html += row('📍 Ciudad', l => l.city);
+  html += row('💶 Precio', l => l.price_eur ? fmt(l.price_eur) + ' €' + (l.price_type === 'all_in' ? ' (incl.)' : '') : '?', l => l.price_eur === bestPrice);
+  html += row('📐 m²', l => l.size_m2 ? fmt(l.size_m2) : '?', l => l.size_m2 === maxSize && maxSize > 0);
+  html += row('€/m²', l => perM2(l) ? perM2(l).toFixed(1) : '?', l => perM2(l) === bestPm2v);
+  html += row('🔥 Deal score', l => l.deal_score != null ? l.deal_score.toFixed(0) + '/100' : '?', l => l.deal_score === maxDeal && maxDeal > 0);
+  html += row('🛋 Amueblado', l => ({furnished:'Sí', upholstered:'Semi', unfurnished:'No'})[l.furnished] || '?');
+  html += row('🌿 Exterior', l => l.outdoor ? l.outdoor.split(',').map(o => OUTDOOR_ES[o] || o).join(', ') : '—');
+  html += row('🏷 Tipo', l => ({apartment:'Apartamento', studio:'Estudio', house:'Casa', room:'Habitación'})[l.property_type] || '?');
+  html += row('🔒 Confianza', l => ({verified:'✅ verificado', needs_check:'⚠ comprobar', possible_scam:'🚨 posible estafa'})[l.trust] || '?');
+  html += row('💰 Depósito', l => l._details?.deposit_eur ? fmt(l._details.deposit_eur) + ' €' : (l._details?.deposit_months ? l._details.deposit_months + ' mes(es)' : '?'));
+  html += row('📅 Entrada', l => l._details?.available_text || l.available_from?.slice(0, 10) || '?');
+  html += row('🏛 Empadron.', l => l._details?.registration === 'yes' ? '✅' : (l._details?.registration === 'no' ? '❌' : '?'));
+  html += row('Portal', l => l.portal);
+  const pcs = sel.map(l => prosCons(l, sel.filter(o => o !== l)));
+  html += '<tr><th>✅ Pros</th>' + pcs.map(pc => `<td><ul class="proslist">${pc.pros.map(p => `<li>${p}</li>`).join('') || '<li>—</li>'}</ul></td>`).join('') + '</tr>';
+  html += '<tr><th>❌ Contras</th>' + pcs.map(pc => `<td><ul class="proslist cons">${pc.cons.map(c => `<li>${c}</li>`).join('') || '<li>—</li>'}</ul></td>`).join('') + '</tr>';
+  html += '</table>';
+  $('compareBody').innerHTML = html;
+  $('compareModal').classList.add('open');
+}
+
+// ---------- estado / notas / alta manual ----------
 
 async function setStatus(id, status) {
   const { error } = await SB.from('listings').update({ status }).eq('id', id);
