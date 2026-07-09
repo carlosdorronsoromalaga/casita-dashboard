@@ -206,9 +206,12 @@ async function fetchAll() {
   const { data: cts } = await SB.from('applyboard_contacts').select('*');
   CONTACTS = cts || [];
   const week = new Date(Date.now() - 7 * 86400e3).toISOString();
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   KPIS = {
     applied: DATA.filter(j => j.applied_at).length,
     applied_week: DATA.filter(j => j.applied_at && j.applied_at >= week).length,
+    applied_month: DATA.filter(j => j.applied_at && j.applied_at >= monthStart).length,
     interviews: DATA.filter(j => ['entrevista','en_proceso','oferta'].includes(j.response_status) || (j.carlos_notes || '').includes('ENTREVISTA')).length,
     waiting: DATA.filter(j => j.applied_at && (!j.response_status || j.response_status === 'sin_respuesta')).length,
     rejected: DATA.filter(j => j.response_status === 'rechazo').length,
@@ -222,6 +225,7 @@ function renderAll() {
   $('kpis').innerHTML = `
     <div class="kpi"><div class="n">${KPIS.applied}</div><div class="l">enviadas</div></div>
     <div class="kpi"><div class="n">${KPIS.applied_week}</div><div class="l">esta semana</div></div>
+    <div class="kpi"><div class="n">${KPIS.applied_month}</div><div class="l">este mes</div></div>
     <div class="kpi good"><div class="n">${KPIS.interviews} · ${KPIS.resp_rate}%</div><div class="l">entrevistas · tasa</div></div>
     <div class="kpi"><div class="n">${KPIS.waiting}</div><div class="l">esperando</div></div>
     <div class="kpi bad"><div class="n">${KPIS.rejected}</div><div class="l">rechazos</div></div>
