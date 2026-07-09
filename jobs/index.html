@@ -61,27 +61,12 @@
            margin-top:10px; min-height:30px; }
   .when { color:var(--muted); font-size:12px; }
   #empty { text-align:center; color:var(--muted); padding:60px; }
-  .addbtn { background:var(--panel2); color:var(--text); border:1px solid #37404b;
-            border-radius:8px; padding:6px 12px; font-size:13px; cursor:pointer; }
-  .modal { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:700; display:none;
-           overflow:auto; padding:30px 16px; }
-  .modal.open { display:block; }
-  .modal-inner { background:var(--panel); border-radius:12px; max-width:480px; margin:auto; padding:20px; }
-  .modal-inner h2 { color:var(--accent); font-size:18px; margin-bottom:12px; }
-  .modal-close { float:right; background:var(--panel2); color:var(--text); border:none;
-                 border-radius:8px; padding:6px 12px; cursor:pointer; }
-  .addform label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
-  .addform input, .addform select { width:100%; background:var(--panel2); color:var(--text);
-    border:1px solid #37404b; border-radius:8px; padding:8px 10px; font-size:13px; }
-  .addform button { margin-top:14px; background:var(--accent2); color:#fff; border:none;
-    border-radius:8px; padding:10px 18px; font-weight:700; cursor:pointer; }
   @media (max-width:640px){ #list{padding:12px} .kpis{display:none} }
 </style>
 </head>
 <body>
 <header>
   <h1>🎯 ApplyBoard</h1>
-  <button class="addbtn" onclick="document.getElementById('addJobModal').classList.add('open')">➕ Añadir manual</button>
   <div class="kpis" id="kpis"></div>
 </header>
 <div class="tabs">
@@ -122,43 +107,11 @@
 <div id="templates" style="display:none;padding:16px 24px;max-width:1000px;margin:auto"></div>
 <div id="contacts" style="display:none;padding:16px 24px;max-width:1000px;margin:auto"></div>
 
-<div class="modal" id="addJobModal">
-  <div class="modal-inner">
-    <button class="modal-close" onclick="document.getElementById('addJobModal').classList.remove('open')">✕ Cerrar</button>
-    <h2>➕ Añadir oferta manual</h2>
-    <p style="color:var(--muted);font-size:12px">Para candidaturas fuera del rastreo automático de ApplyPilot (puerta fría, referidos, portales que no cubre...).</p>
-    <div class="addform">
-      <label>URL de la oferta *</label><input id="ajUrl" placeholder="https://...">
-      <label>Empresa *</label><input id="ajCompany" placeholder="Nombre de la empresa">
-      <label>Puesto *</label><input id="ajTitle" placeholder="Product Manager">
-      <label>Ubicación</label><input id="ajLocation" placeholder="Madrid, España">
-      <label>Ámbito</label>
-      <select id="ajScope">
-        <option value="nl">📍 Países Bajos</option>
-        <option value="spain">🇪🇸 España</option>
-        <option value="ireland">🇮🇪 Irlanda</option>
-        <option value="lu">Luxemburgo</option>
-        <option value="europe">🇪🇺 Europa</option>
-        <option value="other">Otro</option>
-      </select>
-      <label class="toggle" style="margin-top:10px"><input type="checkbox" id="ajRemote"> Remoto</label>
-      <label>Fit score (opcional, 0-10)</label><input id="ajFit" type="number" min="0" max="10">
-      <label>Notas</label><input id="ajNotes" placeholder="Cómo llegaste a esta oferta...">
-      <label class="toggle" style="margin-top:10px"><input type="checkbox" id="ajApplied"> Ya he aplicado</label>
-      <button onclick="submitAddJob()">Guardar</button>
-    </div>
-  </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 let DATA = [], KPIS = {}, CONTACTS = [], TAB = 'queue';
 const $ = id => document.getElementById(id);
 const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const validUrl = v => {
-  const s = (v == null ? '' : String(v)).trim();
-  return (!s || ['none', 'null', 'undefined'].includes(s.toLowerCase())) ? null : s;
-};
 
 
 // ---------- capa de datos: Supabase (version online) ----------
@@ -208,12 +161,9 @@ async function fetchAll() {
   const { data: cts } = await SB.from('applyboard_contacts').select('*');
   CONTACTS = cts || [];
   const week = new Date(Date.now() - 7 * 86400e3).toISOString();
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   KPIS = {
     applied: DATA.filter(j => j.applied_at).length,
     applied_week: DATA.filter(j => j.applied_at && j.applied_at >= week).length,
-    applied_month: DATA.filter(j => j.applied_at && j.applied_at >= monthStart).length,
     interviews: DATA.filter(j => ['entrevista','en_proceso','oferta'].includes(j.response_status) || (j.carlos_notes || '').includes('ENTREVISTA')).length,
     waiting: DATA.filter(j => j.applied_at && (!j.response_status || j.response_status === 'sin_respuesta')).length,
     rejected: DATA.filter(j => j.response_status === 'rechazo').length,
@@ -227,7 +177,6 @@ function renderAll() {
   $('kpis').innerHTML = `
     <div class="kpi"><div class="n">${KPIS.applied}</div><div class="l">enviadas</div></div>
     <div class="kpi"><div class="n">${KPIS.applied_week}</div><div class="l">esta semana</div></div>
-    <div class="kpi"><div class="n">${KPIS.applied_month}</div><div class="l">este mes</div></div>
     <div class="kpi good"><div class="n">${KPIS.interviews} · ${KPIS.resp_rate}%</div><div class="l">entrevistas · tasa</div></div>
     <div class="kpi"><div class="n">${KPIS.waiting}</div><div class="l">esperando</div></div>
     <div class="kpi bad"><div class="n">${KPIS.rejected}</div><div class="l">rechazos</div></div>
@@ -294,8 +243,8 @@ const RESP_OPTS = ['sin_respuesta', 'entrevista', 'en_proceso', 'oferta', 'recha
 
 function card(j) {
   const applied = !!j.applied_at;
-  const url = validUrl(j.application_url) || validUrl(j.url);
-  const external = url && !url.startsWith('email:') && !url.startsWith('outreach:');
+  const url = j.application_url || j.url;
+  const external = !String(url).startsWith('email:') && !String(url).startsWith('outreach:');
   const d = daysAgo(j.applied_at);
   let respSel = '';
   if (applied) {
@@ -331,8 +280,7 @@ function card(j) {
     </div>
     <div class="btns">
       ${external ? `<a class="primary" href="${esc(url)}" target="_blank" rel="noopener">🔗 Abrir oferta</a>`
-                  : (url ? `<span class="chip">${esc(url)}</span>`
-                         : `<span class="chip" style="color:var(--danger)">⚠ sin enlace guardado</span>`)}
+                  : `<span class="chip">${esc(url)}</span>`}
       ${j.cv_exists ? `<button onclick="openFile(${j.rowid}, 'cv')">📄 CV adaptado</button>` : ''}
       ${j.cl_exists ? `<button onclick="openFile(${j.rowid}, 'cl')">✉️ Carta</button>` : ''}
       <button onclick="this.closest('.job').querySelector('.reasoning').classList.toggle('open')">🧠 Por qué encaja</button>
@@ -590,42 +538,6 @@ async function refreshKpis() { /* recalculado en fetchAll; no-op online */ }
 async function openFile(rowid, kind) {
   alert('Los ficheros de CV/carta viven en el PC de casa — este boton solo funciona alli.\n' +
         'El chip "CV listo" te confirma que existe; puedes regenerarlo con prep_one.py.');
-}
-
-function collectAddJobForm() {
-  const body = {
-    url: $('ajUrl').value.trim(), company: $('ajCompany').value.trim(),
-    title: $('ajTitle').value.trim(), location: $('ajLocation').value.trim(),
-    scope: $('ajScope').value, remote: $('ajRemote').checked,
-    fit: $('ajFit').value !== '' ? parseInt($('ajFit').value) : null,
-    notes: $('ajNotes').value.trim(), applied: $('ajApplied').checked,
-  };
-  if (!body.url || !body.company || !body.title) { alert('URL, empresa y puesto son obligatorios'); return null; }
-  return body;
-}
-
-async function submitAddJob() {
-  const body = collectAddJobForm();
-  if (!body) return;
-  const now = new Date().toISOString();
-  const row = {
-    url: body.url, application_url: body.url, company: body.company, title: body.title,
-    location: body.location, site: 'manual', discovered_at: now,
-    fit_score: body.fit, carlos_notes: body.notes,
-    is_nl: body.scope === 'nl' ? 1 : 0, is_spain: body.scope === 'spain' ? 1 : 0,
-    is_ireland: body.scope === 'ireland' ? 1 : 0,
-    is_lu: body.scope === 'lu' ? 1 : 0, is_europe: body.scope === 'europe' ? 1 : 0,
-    is_remote: body.remote ? 1 : 0,
-    applied_at: body.applied ? now : null, apply_status: body.applied ? 'applied' : null,
-  };
-  const { error } = await SB.from('applyboard_jobs').insert(row);
-  if (error) { alert('Error al guardar: ' + error.message); return; }
-  $('addJobModal').classList.remove('open');
-  ['ajUrl', 'ajCompany', 'ajTitle', 'ajLocation', 'ajFit', 'ajNotes'].forEach(id => $(id).value = '');
-  $('ajRemote').checked = false;
-  $('ajApplied').checked = false;
-  await fetchAll();
-  document.querySelector(`.tab[data-tab=${body.applied ? 'applied' : 'all'}]`).click();
 }
 
 async function apiContactAdd(body) {
