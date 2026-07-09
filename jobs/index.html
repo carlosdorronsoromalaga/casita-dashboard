@@ -107,6 +107,7 @@
     <option value="nl_remote">NL + Remoto</option>
     <option value="lu">Luxemburgo</option>
     <option value="spain">🇪🇸 España</option>
+    <option value="ireland">🇮🇪 Irlanda</option>
     <option value="europe">🇪🇺 Europa (sin US)</option>
     <option value="remote_eu">Remoto (sin US)</option>
     <option value="all">Todas</option>
@@ -135,6 +136,7 @@
       <select id="ajScope">
         <option value="nl">📍 Países Bajos</option>
         <option value="spain">🇪🇸 España</option>
+        <option value="ireland">🇮🇪 Irlanda</option>
         <option value="lu">Luxemburgo</option>
         <option value="europe">🇪🇺 Europa</option>
         <option value="other">Otro</option>
@@ -271,6 +273,7 @@ function visible() {
       if (scope === 'nl_remote' && !j.is_nl && !j.is_remote) return false;
       if (scope === 'lu' && !j.is_lu) return false;
       if (scope === 'spain' && !j.is_spain) return false;
+      if (scope === 'ireland' && !j.is_ireland) return false;
       if (scope === 'europe' && !(j.is_europe || (j.is_remote && !j.is_us))) return false;
       if (scope === 'remote_eu' && !(j.is_remote && !j.is_us)) return false;
       if ($('noDutch').checked && j.needs_dutch) return false;
@@ -318,6 +321,7 @@ function card(j) {
       ${j.is_nl ? '<span class="chip nl">NL</span>' : ''}
       ${j.is_lu ? '<span class="chip nl">LU</span>' : ''}
       ${j.is_spain ? '<span class="chip nl">🇪🇸 ES</span>' : ''}
+      ${j.is_ireland ? '<span class="chip nl">🇮🇪 IE</span>' : ''}
       ${j.is_remote ? '<span class="chip">remoto</span>' : ''}
       ${j.needs_dutch ? '<span class="chip senior">🇳🇱 pide holandés</span>' : ''}
       ${j.is_senior ? '<span class="chip senior">senior/lead</span>' : ''}
@@ -609,6 +613,7 @@ async function submitAddJob() {
     location: body.location, site: 'manual', discovered_at: now,
     fit_score: body.fit, carlos_notes: body.notes,
     is_nl: body.scope === 'nl' ? 1 : 0, is_spain: body.scope === 'spain' ? 1 : 0,
+    is_ireland: body.scope === 'ireland' ? 1 : 0,
     is_lu: body.scope === 'lu' ? 1 : 0, is_europe: body.scope === 'europe' ? 1 : 0,
     is_remote: body.remote ? 1 : 0,
     applied_at: body.applied ? now : null, apply_status: body.applied ? 'applied' : null,
