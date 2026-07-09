@@ -111,6 +111,10 @@
 let DATA = [], KPIS = {}, CONTACTS = [], TAB = 'queue';
 const $ = id => document.getElementById(id);
 const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const validUrl = v => {
+  const s = (v == null ? '' : String(v)).trim();
+  return (!s || ['none', 'null', 'undefined'].includes(s.toLowerCase())) ? null : s;
+};
 
 
 // ---------- capa de datos: Supabase (version online) ----------
@@ -241,8 +245,8 @@ const RESP_OPTS = ['sin_respuesta', 'entrevista', 'en_proceso', 'oferta', 'recha
 
 function card(j) {
   const applied = !!j.applied_at;
-  const url = j.application_url || j.url;
-  const external = !String(url).startsWith('email:') && !String(url).startsWith('outreach:');
+  const url = validUrl(j.application_url) || validUrl(j.url);
+  const external = url && !url.startsWith('email:') && !url.startsWith('outreach:');
   const d = daysAgo(j.applied_at);
   let respSel = '';
   if (applied) {
@@ -277,7 +281,8 @@ function card(j) {
     </div>
     <div class="btns">
       ${external ? `<a class="primary" href="${esc(url)}" target="_blank" rel="noopener">🔗 Abrir oferta</a>`
-                  : `<span class="chip">${esc(url)}</span>`}
+                  : (url ? `<span class="chip">${esc(url)}</span>`
+                         : `<span class="chip" style="color:var(--danger)">⚠ sin enlace guardado</span>`)}
       ${j.cv_exists ? `<button onclick="openFile(${j.rowid}, 'cv')">📄 CV adaptado</button>` : ''}
       ${j.cl_exists ? `<button onclick="openFile(${j.rowid}, 'cl')">✉️ Carta</button>` : ''}
       <button onclick="this.closest('.job').querySelector('.reasoning').classList.toggle('open')">🧠 Por qué encaja</button>
