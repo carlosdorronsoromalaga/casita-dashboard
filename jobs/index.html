@@ -326,6 +326,7 @@ function card(j) {
       RESP_OPTS.map(o => `<option ${((j.response_status || 'sin_respuesta') === o) ? 'selected' : ''}>${o}</option>`).join('') +
       '</select>' +
       `<button onclick="copyTemplateFor(${j.rowid}, 'fu_applied', this)">📋 Follow-up</button>` +
+      `<a href="${mailtoTemplateFor(j.rowid, 'fu_applied')}" title="Abrir borrador de follow-up en tu email">✉️</a>` +
       (j.followup_sent_at ? '<span class="chip">follow-up ✓</span>'
         : `<button onclick="update(${j.rowid}, {followup_sent_at: 'now'})">⏰ follow-up hecho</button>`);
   } else {
@@ -359,6 +360,9 @@ function card(j) {
                   : (url ? `<span class="chip">${esc(url)}</span>`
                          : `<span class="chip" style="color:var(--danger)">⚠ sin enlace guardado</span>`)}
       ${j.cv_exists ? `<button onclick="openFile(${j.rowid}, 'cv')">📄 CV adaptado</button>` : ''}
+      ${j.cv_exists ? `<input type="number" min="1" max="9" value="${j.cv_version ?? ''}" placeholder="CV#"
+        title="Con qué número de CV aplicar (ver leyenda en Plantillas)" style="width:52px"
+        onchange="update(${j.rowid}, {cv_version: this.value ? parseInt(this.value) : null})">` : ''}
       ${(j.cl_text || j.cl_exists) ? `<button onclick="openFile(${j.rowid}, 'cl')">✉️ Carta</button>` : ''}
       <button onclick="this.closest('.job').querySelector('.reasoning').classList.toggle('open')">🧠 Por qué encaja</button>
       <button class="${j.starred ? 'on' : ''}" onclick="update(${j.rowid}, {starred: ${j.starred ? 0 : 1}})">⭐</button>
@@ -456,6 +460,27 @@ function fillTemplate(body, j) {
     .replaceAll('{name}', '[NOMBRE]');
 }
 
+function splitSubject(text) {
+  const m = text.match(/^Subject:\s*(.+)\n+([\s\S]*)$/);
+  return m ? { subject: m[1].trim(), body: m[2] } : { subject: '', body: text };
+}
+function mailtoUrl(to, subject, body) {
+  const q = [];
+  if (subject) q.push('subject=' + encodeURIComponent(subject));
+  if (body) q.push('body=' + encodeURIComponent(body));
+  return `mailto:${to || ''}${q.length ? '?' + q.join('&') : ''}`;
+}
+function emailFor(j) {
+  const u = validUrl(j.application_url) || validUrl(j.url);
+  return (u && u.startsWith('email:')) ? u.slice(6) : '';
+}
+function mailtoTemplateFor(rowid, tplId) {
+  const j = DATA.find(x => x.rowid === rowid);
+  const tpl = TEMPLATES.find(t => t.id === tplId);
+  const { subject, body } = splitSubject(fillTemplate(tpl.body, j));
+  return mailtoUrl(emailFor(j), subject, body);
+}
+
 function copyText(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
     const old = btn.textContent;
@@ -472,17 +497,30 @@ function copyTemplateFor(rowid, tplId, btn) {
 
 function renderTemplates() {
   $('templates').innerHTML = '<p style="color:var(--muted);font-size:13px;margin-bottom:14px">' +
-    'Haz clic en 📋 para copiar. Los huecos {company}/{role} se rellenan solos si copias desde ' +
-    'una oferta (botón 📋 Follow-up en las tarjetas); desde aquí se copian con marcadores. ' +
-    'Revisa siempre [NOMBRE] y los corchetes antes de enviar.</p>' +
-    TEMPLATES.map(t => `
+    '📋 copia el texto. ✉️ abre un borrador en tu programa de correo (Gmail/Outlook/Mail) con ' +
+    'asunto y cuerpo ya rellenos — tú añades el destinatario y le das a enviar, no se manda solo. ' +
+    'Los huecos {company}/{role} se rellenan solos si copias desde una oferta (botón 📋 Follow-up ' +
+    'en las tarjetas); desde aquí se copian con marcadores. Revisa siempre [NOMBRE] y los corchetes ' +
+    'antes de enviar.</p>' +
+    TEMPLATES.map(t => {
+      const { subject, body } = splitSubject(t.body);
+      return `
     <div class="job" style="margin-bottom:12px">
       <div class="job-top"><span class="co">${t.title}</span>
-        <button style="margin-left:auto;background:var(--panel2);border:1px solid #37404b;color:var(--text);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer"
-          onclick="copyText(TEMPLATES.find(x=>x.id==='${t.id}').body, this)">📋 Copiar</button>
+        <span style="margin-left:auto;display:flex;gap:6px">
+          <a href="${mailtoUrl('', subject, body)}" style="background:var(--panel2);border:1px solid #37404b;color:var(--text);border-radius:8px;padding:5px 12px;font-size:12px;text-decoration:none">✉️ Abrir borrador</a>
+          <button style="background:var(--panel2);border:1px solid #37404b;color:var(--text);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer"
+            onclick="copyText(TEMPLATES.find(x=>x.id==='${t.id}').body, this)">📋 Copiar</button>
+        </span>
       </div>
       <pre style="white-space:pre-wrap;font-family:inherit;font-size:12.5px;color:var(--muted);margin-top:10px">${esc(t.body)}</pre>
-    </div>`).join('');
+    </div>`;
+    }).join('') +
+    `<div class="job" style="margin-bottom:12px">
+      <div class="co" style="margin-bottom:8px">📝 Leyenda de versiones de CV (solo se guarda en este navegador)</div>
+      <textarea class="notes" id="cvLegend" rows="4" placeholder="Ej: CV 1 = Consultoría/Estrategia IA · CV 2 = Technical/Engineering · CV 3 = Product/Ops..."
+        onchange="localStorage.setItem('cvLegend', this.value)">${esc(localStorage.getItem('cvLegend') || '')}</textarea>
+    </div>`;
 }
 
 // ---------- contactos (puerta fria) ----------
@@ -516,6 +554,7 @@ function contactCard(c) {
       · <span class="chip">${esc(c.source || '')}</span></div>
     <div class="btns">
       <button onclick="copyColdFor('${c.uid}', this)">📋 Copiar puerta fría</button>
+      <a href="${mailtoColdFor(c)}" title="Abrir borrador en tu email">✉️ Abrir borrador</a>
       <button onclick="updateContact('${c.uid}', {last_contacted_at: 'now', status: 'contactado'})">📤 Marcar contactado</button>
     </div>
     <textarea class="notes" placeholder="Notas…" onchange="updateContact('${c.uid}', {notes: this.value}, true)">${esc(c.notes)}</textarea>
@@ -575,12 +614,18 @@ async function updateContact(uid, fields, silent) {
   if (!silent) renderContacts();
 }
 
+function coldTextFor(c) {
+  const tpl = TEMPLATES.find(t => t.id === 'cold_hm');
+  return tpl.body.replaceAll('{company}', c.company)
+    .replaceAll('{name}', c.name || '[NOMBRE]').replaceAll('{role}', '[PUESTO]');
+}
 function copyColdFor(uid, btn) {
   const c = CONTACTS.find(x => x.uid === uid);
-  const tpl = TEMPLATES.find(t => t.id === 'cold_hm');
-  const text = tpl.body.replaceAll('{company}', c.company)
-    .replaceAll('{name}', c.name || '[NOMBRE]').replaceAll('{role}', '[PUESTO]');
-  copyText(text, btn);
+  copyText(coldTextFor(c), btn);
+}
+function mailtoColdFor(c) {
+  const { subject, body } = splitSubject(coldTextFor(c));
+  return mailtoUrl(c.email || '', subject, body);
 }
 
 function render() {
