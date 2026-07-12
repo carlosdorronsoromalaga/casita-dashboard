@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ApplyBoard — búsqueda de empleo NL</title>
+<title>ApplyBoard — búsqueda de empleo NL + Madrid</title>
 <style>
   :root { --bg:#0f1419; --panel:#1a2129; --panel2:#232c36; --text:#e6edf3; --muted:#8b98a5;
           --accent:#60a5fa; --accent2:#3b82f6; --green:#4ade80; --danger:#f87171; --gold:#fbbf24; }
@@ -118,6 +118,14 @@
     <option value="all">🌍 Todas</option>
   </select>
   <select id="site"><option value="">Todas las fuentes</option></select>
+  <select id="cvFilter" title="Filtrar por CV recomendado">
+    <option value="">CV: todos</option>
+    <option value="1">CV1 · Adopción IA</option>
+    <option value="2">CV2 · Consultoría IA</option>
+    <option value="3">CV3 · Engineering</option>
+    <option value="4">CV4 · Product</option>
+    <option value="5">CV5 · Ops/Business</option>
+  </select>
   <label class="toggle"><input type="checkbox" id="noDutch" checked> Sin holandés requerido</label>
   <label class="toggle"><input type="checkbox" id="noSenior" checked> Sin senior/lead</label>
   <label class="toggle"><input type="checkbox" id="withCv"> Solo con CV listo</label>
@@ -303,6 +311,8 @@ function visible() {
       if ($('noSenior').checked && j.is_senior) return false;
       if ($('withCv').checked && !j.cv_exists) return false;
     }
+    const cvf = $('cvFilter').value;
+    if (cvf && j.cv_version !== parseInt(cvf)) return false;
     if (site && j.site !== site) return false;
     if (q && !((j.title || '').toLowerCase().includes(q) || (j.company || '').toLowerCase().includes(q))) return false;
     return true;
@@ -315,10 +325,25 @@ function visible() {
 
 const RESP_OPTS = ['sin_respuesta', 'entrevista', 'en_proceso', 'oferta', 'rechazo'];
 
+// CV con el que aplicar (columna cv_version; ApplyPilot sugiere, aquí se puede
+// corregir a mano). Los ficheros viven en .applypilot\cv_versions y Descargas.
+const CV_LABELS = {1: 'CV1 · Adopción IA', 2: 'CV2 · Consultoría IA',
+                   3: 'CV3 · Engineering', 4: 'CV4 · Product', 5: 'CV5 · Ops/Business'};
+
+function cvSelect(j) {
+  const opts = ['<option value="">CV ?</option>'].concat(
+    Object.entries(CV_LABELS).map(([n, l]) =>
+      `<option value="${n}" ${j.cv_version === parseInt(n) ? 'selected' : ''}>${l}</option>`));
+  return `<select title="CV con el que aplicar (sugerido por ApplyPilot, editable)"
+    onchange="update(${j.rowid}, {cv_version: this.value ? parseInt(this.value) : null}, true)">${opts.join('')}</select>`;
+}
+
 function card(j) {
   const applied = !!j.applied_at;
   const url = validUrl(j.application_url) || validUrl(j.url);
   const external = url && !url.startsWith('email:') && !url.startsWith('outreach:');
+  const emailAddr = url && url.startsWith('email:') ? url.slice(6) : null;
+  const mailtoHref = emailAddr ? `mailto:${emailAddr}?subject=${encodeURIComponent('Application – ' + (j.title || '') + ' | Carlos Dorronsoro')}` : null;
   const d = daysAgo(j.applied_at);
   let respSel = '';
   if (applied) {
@@ -356,8 +381,10 @@ function card(j) {
     </div>
     <div class="btns">
       ${external ? `<a class="primary" href="${esc(url)}" target="_blank" rel="noopener">🔗 Abrir oferta</a>`
+                  : (emailAddr ? `<a class="primary" href="${esc(mailtoHref)}">✉️ Aplicar por email (${esc(emailAddr)})</a>`
                   : (url ? `<span class="chip">${esc(url)}</span>`
-                         : `<span class="chip" style="color:var(--danger)">⚠ sin enlace guardado</span>`)}
+                         : `<span class="chip" style="color:var(--danger)">⚠ sin enlace guardado</span>`))}
+      ${cvSelect(j)}
       ${j.cv_exists ? `<button onclick="openFile(${j.rowid}, 'cv')">📄 CV adaptado</button>` : ''}
       ${(j.cl_text || j.cl_exists) ? `<button onclick="openFile(${j.rowid}, 'cl')">✉️ Carta</button>` : ''}
       <button onclick="this.closest('.job').querySelector('.reasoning').classList.toggle('open')">🧠 Por qué encaja</button>
@@ -471,7 +498,19 @@ function copyTemplateFor(rowid, tplId, btn) {
 }
 
 function renderTemplates() {
-  $('templates').innerHTML = '<p style="color:var(--muted);font-size:13px;margin-bottom:14px">' +
+  $('templates').innerHTML = `
+    <div class="job" style="margin-bottom:14px;border-color:var(--accent2)">
+      <div class="co" style="margin-bottom:8px">📄 Versiones de CV (columna "CV" en cada oferta)</div>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
+        <b style="color:var(--text)">CV1 · Adopción IA</b> — adoption, enablement, training, change mgmt, Copilot<br>
+        <b style="color:var(--text)">CV2 · Consultoría IA</b> — AI consultant, strategy, transformation (el default ante la duda)<br>
+        <b style="color:var(--text)">CV3 · Engineering</b> — solutions engineer, agentic AI, LLM apps, forward deployed<br>
+        <b style="color:var(--text)">CV4 · Product</b> — AI product manager / product owner<br>
+        <b style="color:var(--text)">CV5 · Ops/Business</b> — operations, PMO, programme mgmt, chief of staff<br>
+        Ficheros: <code>Descargas\\CVn - CARLOS DORRONSORO MALAGA - *.pdf</code> (regenerables con
+        <code>build_cv_docx.py</code>). ApplyPilot sugiere el número por oferta; se puede corregir en la propia tarjeta.
+      </div>
+    </div>` + '<p style="color:var(--muted);font-size:13px;margin-bottom:14px">' +
     'Haz clic en 📋 para copiar. Los huecos {company}/{role} se rellenan solos si copias desde ' +
     'una oferta (botón 📋 Follow-up en las tarjetas); desde aquí se copian con marcadores. ' +
     'Revisa siempre [NOMBRE] y los corchetes antes de enviar.</p>' +
@@ -687,7 +726,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   TAB = t.dataset.tab;
   render();
 });
-['q', 'minfit', 'site', 'scope', 'noDutch', 'noSenior', 'withCv'].forEach(id =>
+['q', 'minfit', 'site', 'scope', 'cvFilter', 'noDutch', 'noSenior', 'withCv'].forEach(id =>
   $(id).addEventListener('input', render));
 
 load();
