@@ -9,6 +9,10 @@ Uso:
   python upload_letters.py --dir "C:\\Users\\cdorr\\.applypilot" --apply    # sube de verdad
   python upload_letters.py --dir ... --apply --force                        # re-sube tambien las que ya tienen texto
 
+  # Para Alejandra (su instancia paralela: otra carpeta, otra tabla, su login):
+  python upload_letters.py --dir "C:\\Users\\cdorr\\.applypilot-alejandra" \
+      --table applyboard_jobs_alejandra --email EMAIL_DE_ALEJANDRA --apply
+
 Que hace:
   1. Te pide tu contraseña del dashboard (mismo login que la web).
   2. Descarga la lista de ofertas de Supabase.
@@ -71,10 +75,10 @@ def login(email, password):
         return json.loads(r.read())["access_token"]
 
 
-def fetch_jobs(token):
+def fetch_jobs(token, table):
     jobs, offset = [], 0
     while True:
-        page = api(f"/rest/v1/applyboard_jobs?select=rowid,url,company,title,cl_exists,cl_text"
+        page = api(f"/rest/v1/{table}?select=rowid,url,company,title,cl_exists,cl_text"
                    f"&limit=1000&offset={offset}", token)
         jobs += page
         if len(page) < 1000:
@@ -141,6 +145,9 @@ def main():
     ap.add_argument("--apply", action="store_true", help="Subir de verdad (sin esto: simulacro)")
     ap.add_argument("--force", action="store_true", help="Re-subir tambien ofertas que ya tienen cl_text")
     ap.add_argument("--email", default=DEFAULT_EMAIL)
+    ap.add_argument("--table", default="applyboard_jobs",
+                    help="Tabla de Supabase (applyboard_jobs para Carlos, "
+                         "applyboard_jobs_alejandra para Alejandra)")
     args = ap.parse_args()
 
     base = Path(args.dir)
@@ -154,7 +161,7 @@ def main():
                  "'carta', 'cover', 'letter', 'motivation' o 'cl').")
 
     token = login(args.email, getpass.getpass(f"Contraseña del dashboard ({args.email}): "))
-    jobs = fetch_jobs(token)
+    jobs = fetch_jobs(token, args.table)
     print(f"{len(jobs)} ofertas en Supabase, {sum(1 for j in jobs if j.get('cl_exists'))} con cl_exists=1")
 
     pending = [j for j in jobs if args.force or not j.get("cl_text")]
@@ -182,7 +189,7 @@ def main():
             if not text:
                 print(f"  VACIO, saltado: {p}")
                 continue
-            api("/rest/v1/applyboard_jobs?url=eq." + urllib.parse.quote(j["url"], safe=""),
+            api(f"/rest/v1/{args.table}?url=eq." + urllib.parse.quote(j["url"], safe=""),
                 token, "PATCH", {"cl_text": text})
             ok += 1
             print(f"  ✓ {j['company']} — {(j['title'] or '')[:55]}")
