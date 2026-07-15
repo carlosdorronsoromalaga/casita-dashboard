@@ -114,11 +114,11 @@
 <div class="controls" id="controls">
   <input id="q" placeholder="Buscar puesto o empresa…" size="22">
   <select id="minfit">
-    <option value="8">fit ≥ 8</option>
-    <option value="7">fit ≥ 7</option>
-    <option value="9">fit ≥ 9</option>
+    <option value="0" selected>fit: todos</option>
     <option value="6">fit ≥ 6</option>
-    <option value="0">fit: todos</option>
+    <option value="7">fit ≥ 7</option>
+    <option value="8">fit ≥ 8</option>
+    <option value="9">fit ≥ 9</option>
   </select>
   <select id="scope"></select>
   <select id="site"><option value="">Todas las fuentes</option></select>
@@ -226,7 +226,11 @@ const SCOPE_DEFS = {
   ireland:  { label:'🇮🇪 Irlanda', test:j=>j.is_ireland },
   remote:   { label:'🏠 Remoto', test:j=>j.is_remote },
 };
-const DEFAULT_SCOPES = ['all','spain','nl','randstad','benelux','europe'];
+// Generico de verdad: solo categorias amplias, ningun pais/ciudad especifico
+// de un usuario concreto (antes tenia randstad/benelux, que son la geografia
+// de Alejandra -- Carlos las veia como "esto es de otra persona"). Los
+// paises/ciudades propios de cada quien viven en profiles.scopes via onboarding.
+const DEFAULT_SCOPES = ['all','europe','remote'];
 
 // palabras clave de sector -> regex dinámica (profiles.sector_keywords)
 function sectorRe(){
@@ -236,7 +240,16 @@ function sectorRe(){
   return new RegExp('\\b('+kw.map(esc).join('|')+')\\b','i');
 }
 const isSector = j => { const re=sectorRe(); return re ? re.test((j.title||'')+' '+(j.company||'')) : false; };
-const cvLabels = () => PROFILE?.cv_labels && Object.keys(PROFILE.cv_labels).length ? PROFILE.cv_labels : {1:'CV 1',2:'CV 2',3:'CV 3'};
+// Si el perfil no tiene etiquetas propias (via onboarding), NO adivinar un
+// numero fijo (antes {1,2,3} escondia el CV4/CV5 de Carlos) -- derivar las
+// versiones reales que existen en sus propias ofertas.
+const cvLabels = () => {
+  if (PROFILE?.cv_labels && Object.keys(PROFILE.cv_labels).length) return PROFILE.cv_labels;
+  const found = new Set(DATA.map(j => j.cv_version).filter(v => v != null));
+  const out = {};
+  [...found].sort((a, b) => a - b).forEach(n => out[n] = `CV ${n}`);
+  return out;
+};
 
 // ============================ capa de datos ============================
 function showLogin(){
