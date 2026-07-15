@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ApplyBoard</title>
+<style>
+  /* Tema oscuro por defecto; el acento (--accent*) lo fija el perfil del
+     usuario en runtime. Todo lo específico de persona vive en la BD, no aquí. */
+  :root {
+    --bg:#0f1216; --panel:#171b21; --panel2:#1f242c; --line:#2a3038;
+    --text:#e7edf3; --muted:#8a95a3; --danger:#f87171; --green:#4ade80;
+    --gold:#fbbf24; --red:#f87171;
+    --accent:#3987e5; --accent-soft:#6da7ec; --accent-strong:#1c5cab; --accent-ink:#fff;
+    /* superficies de gráfico (dataviz) */
+    --surface:#171b21; --grid:#252b33; --axis:#333b45;
+    --ink:#e7edf3; --ink2:#8a95a3;
+  }
+  :root[data-theme="light"] {
+    --bg:#f4f5f7; --panel:#ffffff; --panel2:#f0f2f5; --line:#e2e5ea;
+    --text:#111418; --muted:#6b7280; --surface:#ffffff; --grid:#eceef1; --axis:#cbd0d6;
+    --ink:#111418; --ink2:#6b7280;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,'Segoe UI',sans-serif; }
+  header { padding:12px 22px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+           border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:500; }
+  header h1 { font-size:18px; color:var(--accent); display:flex; align-items:center; gap:8px; }
+  .hbtn { background:var(--panel2); color:var(--text); border:1px solid var(--line);
+          border-radius:8px; padding:6px 11px; font-size:13px; cursor:pointer; }
+  .hbtn:hover { border-color:var(--accent); }
+  .spacer { margin-left:auto; }
+  .kpis { display:flex; gap:8px; flex-wrap:wrap; }
+  .kpi { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px 13px; text-align:center; }
+  .kpi .n { font-size:16px; font-weight:700; color:var(--accent); }
+  .kpi .l { font-size:10px; color:var(--muted); }
+  .kpi.good .n { color:var(--green); } .kpi.bad .n { color:var(--danger); }
+  .tabs { display:flex; gap:6px; padding:12px 22px 0; flex-wrap:wrap; }
+  .tab { background:var(--panel); border:1px solid var(--line); color:var(--muted); border-radius:999px;
+         padding:6px 14px; font-size:13px; cursor:pointer; }
+  .tab.active { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:600; }
+  .controls { display:flex; gap:8px; padding:12px 22px; flex-wrap:wrap; align-items:center;
+              background:var(--panel); border-bottom:1px solid var(--line); }
+  .controls input, .controls select { background:var(--panel2); color:var(--text);
+    border:1px solid var(--line); border-radius:8px; padding:7px 10px; font-size:13px; outline:none; }
+  .controls input:focus, .controls select:focus { border-color:var(--accent); }
+  .toggle { color:var(--muted); font-size:12px; display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+  .toggle input { accent-color:var(--accent); }
+  #count { color:var(--muted); font-size:13px; margin-left:auto; }
+  #list { padding:16px 22px; display:flex; flex-direction:column; gap:12px; max-width:1000px; margin:auto; }
+  .job { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .job.starred { border-color:var(--gold); }
+  .job.applied { border-left:4px solid var(--green); }
+  .job-top { display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
+  .fit { font-size:22px; font-weight:800; color:var(--accent); min-width:40px; }
+  .fit.high { color:var(--green); }
+  .co { font-weight:700; font-size:15px; }
+  .ti { font-size:14px; color:var(--text); flex:1 1 100%; margin-top:2px; }
+  .meta { color:var(--muted); font-size:12px; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .chip { background:var(--panel2); border-radius:5px; padding:1px 7px; font-size:11px; color:var(--muted); }
+  .chip.on { color:var(--green); }
+  .chip.warn { color:var(--gold); }
+  .btns { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+  .btns a, .btns button { background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:6px 12px; font-size:12.5px; cursor:pointer; text-decoration:none; }
+  .btns a:hover, .btns button:hover { border-color:var(--accent); }
+  .btns .primary { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
+  .btns .applybtn { background:var(--green); border-color:var(--green); color:#06220f; font-weight:700; }
+  .btns button.staron { color:var(--gold); border-color:var(--gold); }
+  .btns .danger { color:var(--danger); }
+  .btns select { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:12.5px; }
+  .reasoning { display:none; background:var(--panel2); border-radius:8px; padding:10px 12px;
+               font-size:12.5px; color:var(--muted); margin-top:10px; white-space:pre-wrap; }
+  .reasoning.open { display:block; }
+  .reasoning b { color:var(--text); }
+  .notes { width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+           color:var(--text); font-size:12px; padding:7px 10px; resize:vertical; outline:none; margin-top:10px; min-height:30px; }
+  .when { color:var(--muted); font-size:12px; }
+  #empty { text-align:center; color:var(--muted); padding:60px; }
+  /* modales */
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:700; display:none; overflow:auto; padding:30px 16px; }
+  .modal.open { display:block; }
+  .modal-inner { background:var(--panel); border-radius:12px; max-width:520px; margin:auto; padding:20px; border:1px solid var(--line); }
+  .modal-inner h2 { color:var(--accent); font-size:18px; margin-bottom:12px; }
+  .modal-close { float:right; background:var(--panel2); color:var(--text); border:none; border-radius:8px; padding:6px 12px; cursor:pointer; }
+  .form label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
+  .form input, .form select, .form textarea { width:100%; background:var(--panel2); color:var(--text);
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; outline:none; }
+  .form .row { display:flex; gap:10px; } .form .row > div { flex:1; }
+  .form .flags { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
+  .form button.save { margin-top:14px; background:var(--accent); color:var(--accent-ink); border:none;
+    border-radius:8px; padding:10px 18px; font-weight:700; cursor:pointer; }
+  /* dashboard */
+  #dash { padding:18px 22px; max-width:1080px; margin:auto; display:none; }
+  .dash-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .card h3 { font-size:13px; color:var(--muted); font-weight:600; margin-bottom:14px; letter-spacing:.02em; }
+  .card .sub { font-size:11px; color:var(--muted); font-weight:400; }
+  svg { display:block; width:100%; height:auto; overflow:visible; }
+  .emptychart { color:var(--muted); font-size:12px; padding:20px 0; text-align:center; }
+  @media (max-width:640px){ #list{padding:12px} .kpis .kpi:nth-child(n+5){display:none} }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="brand">🎯 ApplyBoard</h1>
+  <button class="hbtn" onclick="openAdd()">➕ Añadir</button>
+  <div class="kpis spacer" id="kpis"></div>
+  <button class="hbtn" id="themeBtn" title="Modo claro/oscuro" onclick="toggleTheme()">🌙</button>
+  <button class="hbtn" id="trashBtn" title="Papelera" onclick="setTab('trash')">🗑</button>
+  <button class="hbtn" title="Salir" onclick="logout()">Salir</button>
+</header>
+<div class="tabs" id="tabs"></div>
+<div class="controls" id="controls">
+  <input id="q" placeholder="Buscar puesto o empresa…" size="22">
+  <select id="minfit">
+    <option value="8">fit ≥ 8</option>
+    <option value="7">fit ≥ 7</option>
+    <option value="9">fit ≥ 9</option>
+    <option value="6">fit ≥ 6</option>
+    <option value="0">fit: todos</option>
+  </select>
+  <select id="scope"></select>
+  <select id="site"><option value="">Todas las fuentes</option></select>
+  <select id="sort">
+    <option value="fit">Ordenar: fit</option>
+    <option value="discovered">Ordenar: más recientes</option>
+    <option value="applied">Ordenar: fecha aplicada</option>
+  </select>
+  <label class="toggle"><input type="checkbox" id="noIntern"> Sin prácticas</label>
+  <label class="toggle"><input type="checkbox" id="noSenior"> Sin senior/lead</label>
+  <label class="toggle"><input type="checkbox" id="noLang"> Sin idioma bloqueante</label>
+  <label class="toggle"><input type="checkbox" id="withCl"> Solo con carta lista</label>
+  <span id="count"></span>
+</div>
+<div id="dash"></div>
+<div id="list"></div>
+
+<!-- modal: añadir / editar oferta -->
+<div class="modal" id="jobModal">
+  <div class="modal-inner">
+    <button class="modal-close" onclick="closeModal('jobModal')">✕</button>
+    <h2 id="jobModalTitle">➕ Añadir oferta</h2>
+    <div class="form">
+      <label>URL de la oferta *</label><input id="fUrl" placeholder="https://...">
+      <div class="row">
+        <div><label>Empresa *</label><input id="fCompany"></div>
+        <div><label>Fit (0-10)</label><input id="fFit" type="number" min="0" max="10"></div>
+      </div>
+      <label>Puesto *</label><input id="fTitle">
+      <div class="row">
+        <div><label>Ubicación</label><input id="fLocation"></div>
+        <div><label>Ámbito</label><select id="fScope"></select></div>
+      </div>
+      <div class="row">
+        <div><label>CV</label><select id="fCv"></select></div>
+        <div><label>Fuente</label><input id="fSite" placeholder="manual"></div>
+      </div>
+      <label>Salario (si consta)</label><input id="fSalary">
+      <label>Notas de condiciones (salario vs coste de vida, mudanza…)</label><textarea id="fConditions" rows="2"></textarea>
+      <div class="flags">
+        <label class="toggle"><input type="checkbox" id="fRemote"> Remoto</label>
+        <label class="toggle"><input type="checkbox" id="fSenior"> Senior/lead</label>
+        <label class="toggle"><input type="checkbox" id="fIntern"> Prácticas</label>
+      </div>
+      <label>Idioma bloqueante (si pide uno que no hablas)</label><input id="fLang" placeholder="p. ej. francés">
+      <label>Notas</label><textarea id="fNotes" rows="2"></textarea>
+      <button class="save" onclick="saveJob()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: carta -->
+<div class="modal" id="letterModal">
+  <div class="modal-inner" style="max-width:700px">
+    <button class="modal-close" onclick="closeModal('letterModal')">✕</button>
+    <h2>✉️ Carta de motivación</h2>
+    <div id="letterCompany" style="color:var(--muted);font-size:13px;margin-bottom:10px"></div>
+    <pre id="letterText" style="white-space:pre-wrap;font-family:inherit;font-size:13px;background:var(--panel2);border-radius:8px;padding:12px;max-height:60vh;overflow:auto"></pre>
+    <button class="save" style="margin-top:14px" onclick="copyText(document.getElementById('letterText').textContent,this)">📋 Copiar carta</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+// ============================ configuración ============================
+// Clave publishable: pública por diseño; la seguridad la dan login + RLS.
+const SB_URL = 'https://wzikfazbfgtxljtkkphm.supabase.co';
+const SB_ANON = 'sb_publishable_pMmT_8oxKBcqU-fD_4yTqA_YKNVm6jN';
+
+let SB = null, DATA = [], PROFILE = null, TAB = 'dash', EDIT_ID = null;
+const $ = id => document.getElementById(id);
+const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const validUrl = v => { const s=(v==null?'':String(v)).trim(); return (!s||['none','null','undefined'].includes(s.toLowerCase()))?null:s; };
+const daysAgo = iso => iso ? Math.floor((Date.now()-new Date(iso).getTime())/86400e3) : null;
+
+// temas de acento (configurables por usuario en profiles.theme)
+const THEMES = {
+  blue:   { a:'#3987e5', soft:'#6da7ec', strong:'#1c5cab', ink:'#fff' },
+  purple: { a:'#8b5cf6', soft:'#a78bfa', strong:'#6d28d9', ink:'#fff' },
+  green:  { a:'#10b981', soft:'#34d399', strong:'#047857', ink:'#04140d' },
+  amber:  { a:'#f59e0b', soft:'#fbbf24', strong:'#b45309', ink:'#1a1206' },
+};
+function applyTheme(name){
+  const t = THEMES[name] || THEMES.blue;
+  const r = document.documentElement.style;
+  r.setProperty('--accent', t.a); r.setProperty('--accent-soft', t.soft);
+  r.setProperty('--accent-strong', t.strong); r.setProperty('--accent-ink', t.ink);
+}
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute('data-theme')==='light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', cur);
+  $('themeBtn').textContent = cur==='light' ? '☀️' : '🌙';
+}
+
+// ámbitos geográficos: la lógica (test) vive en código (seguro); QUÉ ámbitos
+// aparecen y en qué orden es dato por usuario (profiles.scopes).
+const RANDSTAD_RE = /amsterdam|rotterdam|den haag|the hague|utrecht|amstelveen|haarlem|leiden|delft|schiphol|hoofddorp|zoetermeer|hilversum|almere/i;
+const SCOPE_DEFS = {
+  all:      { label:'🌍 Todos', test:()=>true },
+  spain:    { label:'🇪🇸 España', test:j=>j.is_spain },
+  nl:       { label:'🇳🇱 Países Bajos', test:j=>j.is_nl },
+  randstad: { label:'🇳🇱 Randstad', test:j=>j.is_nl && RANDSTAD_RE.test(j.location||'') },
+  benelux:  { label:'🇧🇪🇱🇺 Benelux', test:j=>j.is_be||j.is_lu },
+  europe:   { label:'🇪🇺 Europa', test:j=>j.is_europe||(j.is_remote&&!j.is_us) },
+  ireland:  { label:'🇮🇪 Irlanda', test:j=>j.is_ireland },
+  remote:   { label:'🏠 Remoto', test:j=>j.is_remote },
+};
+const DEFAULT_SCOPES = ['all','spain','nl','randstad','benelux','europe'];
+
+// palabras clave de sector -> regex dinámica (profiles.sector_keywords)
+function sectorRe(){
+  const kw = (PROFILE?.sector_keywords||'').split(',').map(s=>s.trim()).filter(Boolean);
+  if (!kw.length) return null;
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp('\\b('+kw.map(esc).join('|')+')\\b','i');
+}
+const isSector = j => { const re=sectorRe(); return re ? re.test((j.title||'')+' '+(j.company||'')) : false; };
+const cvLabels = () => PROFILE?.cv_labels && Object.keys(PROFILE.cv_labels).length ? PROFILE.cv_labels : {1:'CV 1',2:'CV 2',3:'CV 3'};
+
+// ============================ capa de datos ============================
+function showLogin(){
+  const d=document.createElement('div'); d.id='loginOverlay';
+  d.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:900;display:flex;align-items:center;justify-content:center';
+  d.innerHTML=`<div style="background:var(--panel);padding:30px;border-radius:12px;max-width:340px;width:90%;border:1px solid var(--line)">
+    <h2 style="color:var(--accent);margin-bottom:14px">🎯 ApplyBoard</h2>
+    <input id="liEmail" type="email" placeholder="Email" autocomplete="username" style="width:100%;margin-bottom:8px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 10px">
+    <input id="liPass" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-bottom:12px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 10px">
+    <button onclick="doLogin()" style="width:100%;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer">Entrar</button>
+    <p id="liErr" style="color:var(--danger);font-size:12px;margin-top:8px"></p></div>`;
+  document.body.appendChild(d);
+  $('liPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+}
+async function doLogin(){
+  const { error } = await SB.auth.signInWithPassword({ email:$('liEmail').value.trim(), password:$('liPass').value });
+  if (error){ $('liErr').textContent='Error: '+error.message; return; }
+  $('loginOverlay').remove();
+  await boot();
+}
+async function logout(){ await SB.auth.signOut(); location.reload(); }
+
+async function loadProfile(){
+  const { data:{ user } } = await SB.auth.getUser();
+  let { data, error } = await SB.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
+  if (error){ alert('Error cargando perfil: '+error.message); return null; }
+  if (!data){
+    // primera vez: crea un perfil por defecto (nombre = parte del email)
+    const name = (user.email||'').split('@')[0];
+    const ins = await SB.from('profiles').insert({ user_id:user.id, display_name:name, full_name:name, theme:'blue' }).select().single();
+    data = ins.data;
+  }
+  return data;
+}
+async function fetchJobs(){
+  let all=[], from=0;
+  while(true){
+    const { data, error } = await SB.from('jobs').select('*').is('deleted_at', null).range(from, from+999);
+    if (error){ alert('Error cargando ofertas: '+error.message); return; }
+    all = all.concat(data);
+    if (data.length<1000) break; from+=1000;
+  }
+  DATA = all;
+}
+async function fetchTrash(){
+  const { data } = await SB.from('jobs').select('*').not('deleted_at','is',null).order('deleted_at',{ascending:false});
+  return data||[];
+}
+
+async function boot(){
+  PROFILE = await loadProfile();
+  if (!PROFILE) return;
+  applyTheme(PROFILE.theme);
+  $('brand').innerHTML = `🎯 ApplyBoard${PROFILE.display_name?' · '+esc(PROFILE.display_name):''}`;
+  document.title = 'ApplyBoard'+(PROFILE.display_name?' · '+PROFILE.display_name:'');
+  buildScopeSelectors();
+  buildTabs();
+  wireControls();
+  await fetchJobs();
+  renderAll();
+}
+
+async function load(){
+  SB = supabase.createClient(SB_URL, SB_ANON);
+  const { data:{ session } } = await SB.auth.getSession();
+  if (!session){ showLogin(); return; }
+  await boot();
+}
+
+// ============================ estructura UI ============================
+function userScopes(){
+  const s = (PROFILE?.scopes && PROFILE.scopes.length) ? PROFILE.scopes : DEFAULT_SCOPES;
+  return s.filter(k=>SCOPE_DEFS[k]);
+}
+function buildScopeSelectors(){
+  const opts = userScopes().map(k=>`<option value="${k}">${SCOPE_DEFS[k].label}</option>`).join('');
+  $('scope').innerHTML = opts;
+  $('fScope').innerHTML = userScopes().filter(k=>k!=='all').map(k=>`<option value="${k}">${SCOPE_DEFS[k].label}</option>`).join('')+'<option value="other">Otro</option>';
+  $('fCv').innerHTML = '<option value="">CV ?</option>'+Object.entries(cvLabels()).map(([n,l])=>`<option value="${n}">${esc(l)}</option>`).join('');
+}
+const TABS = [
+  { id:'dash',     label:'📊 Dashboard' },
+  { id:'queue',    label:'🎯 Aplicar ahora' },
+  { id:'sector',   label:null },  // etiqueta dinámica desde el perfil
+  { id:'starred',  label:'⭐ Favoritas' },
+  { id:'applied',  label:'📤 Aplicadas' },
+  { id:'rejected', label:'❌ Rechazadas' },
+  { id:'followup', label:'⏰ Follow-ups' },
+  { id:'skipped',  label:'🗑 Descartadas' },
+  { id:'all',      label:'Todas' },
+];
+function buildTabs(){
+  $('tabs').innerHTML = TABS.map(t=>{
+    const label = t.id==='sector' ? '🏦 '+esc(PROFILE?.sector_label||'Mi sector') : t.label;
+    return `<button class="tab${t.id===TAB?' active':''}" data-tab="${t.id}">${label}</button>`;
+  }).join('');
+  document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>setTab(t.dataset.tab));
+}
+function setTab(tab){
+  TAB = tab;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===tab));
+  render();
+}
+function wireControls(){
+  ['q','minfit','scope','site','sort','noIntern','noSenior','noLang','withCl'].forEach(id=>{
+    $(id).addEventListener('input', render);
+  });
+}
+
+// ============================ filtrado ============================
+function passesCommon(j){
+  const minfit = parseInt($('minfit').value);
+  if ((j.fit_score??0) < minfit) return false;
+  if (!SCOPE_DEFS[$('scope').value].test(j)) return false;
+  if ($('noIntern').checked && j.is_internship) return false;
+  if ($('noSenior').checked && j.is_senior) return false;
+  if ($('noLang').checked && j.blocking_language) return false;
+  if ($('withCl').checked && !(j.cl_text||j.cl_exists)) return false;
+  return true;
+}
+function visible(){
+  const q=$('q').value.toLowerCase(), site=$('site').value, sort=$('sort').value;
+  let out = DATA.filter(j=>{
+    const applied=!!j.applied_at, skipped=j.apply_status==='skipped';
+    const rejected = j.response_status==='rechazo';
+    if (TAB==='queue'   && (applied||skipped)) return false;
+    if (TAB==='sector'  && (applied||skipped||!isSector(j))) return false;
+    if (TAB==='starred' && !(j.starred&&!applied)) return false;
+    if (TAB==='applied' && !(applied&&!rejected)) return false;
+    if (TAB==='rejected'&& !rejected) return false;
+    if (TAB==='followup'){
+      const d=daysAgo(j.applied_at);
+      if (!(applied && d>=7 && !j.followup_sent_at && (!j.response_status||j.response_status==='sin_respuesta'))) return false;
+    }
+    if (TAB==='skipped' && !skipped) return false;
+    if (['queue','sector','all'].includes(TAB) && !passesCommon(j)) return false;
+    if (site && j.site!==site) return false;
+    if (q && !((j.title||'').toLowerCase().includes(q)||(j.company||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  if (sort==='applied' || TAB==='applied' || TAB==='rejected') out.sort((a,b)=>(b.applied_at||'').localeCompare(a.applied_at||''));
+  else if (sort==='discovered') out.sort((a,b)=>(b.discovered_at||'').localeCompare(a.discovered_at||''));
+  else if (TAB==='followup') out.sort((a,b)=>(a.applied_at||'').localeCompare(b.applied_at||''));
+  else out.sort((a,b)=>(b.starred-a.starred)||((b.fit_score??0)-(a.fit_score??0)));
+  return out.slice(0,200);
+}
+
+// ============================ KPIs ============================
+function computeKpis(){
+  const week=new Date(Date.now()-7*86400e3).toISOString();
+  const now=new Date(), monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString();
+  const applied=DATA.filter(j=>j.applied_at);
+  const interviews=DATA.filter(j=>['entrevista','en_proceso','oferta'].includes(j.response_status));
+  return {
+    applied:applied.length,
+    week:applied.filter(j=>j.applied_at>=week).length,
+    month:applied.filter(j=>j.applied_at>=monthStart).length,
+    interviews:interviews.length,
+    resp_rate:applied.length?Math.round(100*interviews.length/applied.length):0,
+    waiting:applied.filter(j=>!j.response_status||j.response_status==='sin_respuesta').length,
+    rejected:DATA.filter(j=>j.response_status==='rechazo').length,
+    queue:DATA.filter(j=>(j.fit_score??0)>=8 && !j.is_senior && !j.is_internship && !j.blocking_language && !j.applied_at && j.apply_status!=='skipped').length,
+  };
+}
+function renderKpis(){
+  const k=computeKpis();
+  $('kpis').innerHTML=`
+    <div class="kpi"><div class="n">${k.applied}</div><div class="l">enviadas</div></div>
+    <div class="kpi"><div class="n">${k.week}</div><div class="l">esta semana</div></div>
+    <div class="kpi good"><div class="n">${k.interviews} · ${k.resp_rate}%</div><div class="l">entrevistas · tasa</div></div>
+    <div class="kpi"><div class="n">${k.waiting}</div><div class="l">esperando</div></div>
+    <div class="kpi bad"><div class="n">${k.rejected}</div><div class="l">rechazos</div></div>
+    <div class="kpi"><div class="n">${k.queue}</div><div class="l">cola lista</div></div>`;
+}
+
+// ============================ render principal ============================
+function renderAll(){
+  renderKpis();
+  const sites=[...new Set(DATA.map(j=>j.site).filter(Boolean))].sort();
+  $('site').innerHTML='<option value="">Todas las fuentes</option>'+sites.map(s=>`<option>${esc(s)}</option>`).join('');
+  render();
+}
+function render(){
+  const isDash = TAB==='dash', isTrash = TAB==='trash';
+  $('dash').style.display = isDash ? 'block' : 'none';
+  $('controls').style.display = (isDash||isTrash) ? 'none' : 'flex';
+  $('list').style.display = isDash ? 'none' : 'flex';
+  if (isDash){ renderDash(); return; }
+  if (isTrash){ renderTrash(); return; }
+  const items=visible();
+  $('count').textContent=items.length+' ofertas';
+  $('list').innerHTML = items.length ? items.map(card).join('') : '<div id="empty">Nada aquí con estos filtros.</div>';
+}
+
+// ============================ tarjeta de oferta ============================
+const RESP_OPTS=['sin_respuesta','entrevista','en_proceso','oferta','rechazo'];
+function cvSelect(j){
+  const opts=['<option value="">CV ?</option>'].concat(Object.entries(cvLabels()).map(([n,l])=>
+    `<option value="${n}" ${j.cv_version===parseInt(n)?'selected':''}>${esc(l)}</option>`));
+  return `<select title="CV con el que aplicar" onchange="update(${j.id},{cv_version:this.value?parseInt(this.value):null},true)">${opts.join('')}</select>`;
+}
+function card(j){
+  const applied=!!j.applied_at;
+  const url=validUrl(j.application_url)||validUrl(j.url);
+  const external=url&&!url.startsWith('email:')&&!url.startsWith('outreach:');
+  const emailAddr=url&&url.startsWith('email:')?url.slice(6):null;
+  const mailto=emailAddr?`mailto:${emailAddr}?subject=${encodeURIComponent('Application – '+(j.title||'')+' | '+(PROFILE.full_name||''))}`:null;
+  const d=daysAgo(j.applied_at);
+  let resp='';
+  if (applied){
+    resp=`<select onchange="update(${j.id},{response_status:this.value})">`+
+      RESP_OPTS.map(o=>`<option ${((j.response_status||'sin_respuesta')===o)?'selected':''}>${o}</option>`).join('')+'</select>'+
+      (PROFILE.templates&&PROFILE.templates.length?`<button onclick="copyTpl(${j.id},'fu_applied',this)">📋 Follow-up</button>`:'')+
+      (j.followup_sent_at?'<span class="chip">follow-up ✓</span>':`<button onclick="update(${j.id},{followup_sent_at:'now'})">⏰ follow-up hecho</button>`);
+  }
+  return `<div class="job ${j.starred?'starred':''} ${applied?'applied':''}">
+    <div class="job-top">
+      <span class="fit ${(j.fit_score??0)>=9?'high':''}">${j.fit_score??'–'}</span>
+      <span class="co">${j.starred?'⭐ ':''}${esc(j.company||j.site)}</span>
+      ${applied?`<span class="when">aplicada ${j.applied_at.slice(0,10)} · hace ${d}d</span>`:''}
+    </div>
+    <div class="ti">${esc(j.title)}</div>
+    <div class="meta">
+      <span>📍 ${esc((j.location||'?').split(',').slice(0,2).join(','))}</span>
+      <span class="chip">${esc(j.site)}</span>
+      ${j.is_nl?'<span class="chip on">🇳🇱 NL</span>':''}
+      ${j.is_spain?'<span class="chip on">🇪🇸 ES</span>':''}
+      ${j.is_be?'<span class="chip on">🇧🇪 BE</span>':''}
+      ${j.is_lu?'<span class="chip on">🇱🇺 LU</span>':''}
+      ${isSector(j)?`<span class="chip on">🎯 ${esc(PROFILE.sector_label||'sector')}</span>`:''}
+      ${j.is_remote?'<span class="chip">remoto</span>':''}
+      ${j.blocking_language?`<span class="chip warn">🌐 pide ${esc(j.blocking_language)}</span>`:''}
+      ${j.is_internship?'<span class="chip warn">prácticas</span>':''}
+      ${j.is_senior?'<span class="chip warn">senior/lead</span>':''}
+      ${j.salary_text?`<span class="chip">💶 ${esc(j.salary_text)}</span>`:''}
+      ${j.cl_text?'<span class="chip on">✉️ carta</span>':(j.cl_exists?'<span class="chip">carta (PC)</span>':'')}
+    </div>
+    <div class="btns">
+      ${external?`<a class="primary" href="${esc(url)}" target="_blank" rel="noopener">🔗 Abrir</a>`
+                :(emailAddr?`<a class="primary" href="${esc(mailto)}">✉️ Email</a>`
+                :(url?`<span class="chip">${esc(url)}</span>`:`<span class="chip" style="color:var(--danger)">⚠ sin enlace</span>`))}
+      ${cvSelect(j)}
+      ${(j.cl_text||j.cl_exists)?`<button onclick="openLetter(${j.id})">✉️ Carta</button>`:''}
+      <button onclick="this.closest('.job').querySelector('.reasoning').classList.toggle('open')">🧠 Por qué</button>
+      <button class="${j.starred?'staron':''}" onclick="update(${j.id},{starred:${j.starred?0:1}})">⭐</button>
+      ${!applied?`<button class="applybtn" onclick="if(confirm('¿Marcar como APLICADA?'))update(${j.id},{applied_at:'now',apply_status:'applied'})">✅ Aplicada</button>`:''}
+      ${!applied?`<button class="danger" onclick="update(${j.id},{apply_status:${j.apply_status==='skipped'?'null':"'skipped'"}})">${j.apply_status==='skipped'?'↩ Recuperar':'🗑 Descartar'}</button>`:''}
+      <button onclick="openEdit(${j.id})">✏️ Editar</button>
+      <button class="danger" onclick="softDelete(${j.id})">🗑 Eliminar</button>
+      ${resp}
+    </div>
+    <div class="reasoning"><b>Razonamiento del score:</b>
+${esc(j.score_reasoning||'sin datos')}${j.conditions_notes?`
+
+<b>Condiciones:</b>
+${esc(j.conditions_notes)}`:''}
+
+<b>Descripción (extracto):</b>
+${esc((j.descr||'').slice(0,900))}</div>
+    <textarea class="notes" placeholder="Notas (se guardan solas)…" onchange="update(${j.id},{user_notes:this.value},true)">${esc(j.user_notes)}</textarea>
+  </div>`;
+}
+
+// ============================ acciones ============================
+async function update(id, fields, silent){
+  const j=DATA.find(x=>x.id===id); if(!j) return;
+  const now=new Date().toISOString(), clean={};
+  for (const [k,v] of Object.entries(fields)) clean[k]= v==='now'?now : (v==='null'?null:v);
+  const { error }=await SB.from('jobs').update(clean).eq('id', id);
+  if (error){ alert('No guardado: '+error.message); return; }
+  Object.assign(j, clean);
+  if (!silent){ renderKpis(); render(); }
+}
+async function softDelete(id){
+  if (!confirm('¿Eliminar esta oferta? Se puede recuperar desde la papelera 🗑.')) return;
+  const { error }=await SB.from('jobs').update({ deleted_at:new Date().toISOString() }).eq('id', id);
+  if (error){ alert('No eliminado: '+error.message); return; }
+  DATA = DATA.filter(x=>x.id!==id);
+  renderKpis(); render();
+}
+async function restoreJob(id){
+  const { error }=await SB.from('jobs').update({ deleted_at:null }).eq('id', id);
+  if (error){ alert('No recuperado: '+error.message); return; }
+  await fetchJobs(); renderAll(); setTab('trash');
+}
+
+// ---- papelera ----
+async function renderTrash(){
+  $('list').style.display='flex';
+  const items=await fetchTrash();
+  $('list').innerHTML = `<div style="color:var(--muted);font-size:13px;margin-bottom:6px">🗑 Papelera — ${items.length} eliminadas. Recupéralas o déjalas.</div>`+
+    (items.length?items.map(j=>`<div class="job">
+      <div class="job-top"><span class="fit">${j.fit_score??'–'}</span><span class="co">${esc(j.company||j.site)}</span>
+        <span class="when">eliminada ${(j.deleted_at||'').slice(0,10)}</span></div>
+      <div class="ti">${esc(j.title)}</div>
+      <div class="btns"><button onclick="restoreJob(${j.id})">↩ Recuperar</button></div>
+    </div>`).join('') : '<div id="empty">Papelera vacía.</div>');
+  $('count').textContent='';
+}
+
+// ---- añadir / editar ----
+function openAdd(){
+  EDIT_ID=null; $('jobModalTitle').textContent='➕ Añadir oferta';
+  ['fUrl','fCompany','fTitle','fLocation','fFit','fSalary','fConditions','fLang','fNotes','fSite'].forEach(id=>$(id).value='');
+  ['fRemote','fSenior','fIntern'].forEach(id=>$(id).checked=false);
+  $('fCv').value=''; $('fScope').selectedIndex=0;
+  openModal('jobModal');
+}
+function openEdit(id){
+  const j=DATA.find(x=>x.id===id); if(!j) return;
+  EDIT_ID=id; $('jobModalTitle').textContent='✏️ Editar oferta';
+  $('fUrl').value=j.url||''; $('fCompany').value=j.company||''; $('fTitle').value=j.title||'';
+  $('fLocation').value=j.location||''; $('fFit').value=j.fit_score??''; $('fSalary').value=j.salary_text||'';
+  $('fConditions').value=j.conditions_notes||''; $('fLang').value=j.blocking_language||'';
+  $('fNotes').value=j.user_notes||''; $('fSite').value=j.site||''; $('fCv').value=j.cv_version||'';
+  $('fRemote').checked=!!j.is_remote; $('fSenior').checked=!!j.is_senior; $('fIntern').checked=!!j.is_internship;
+  const sk=Object.keys(SCOPE_DEFS).find(k=>k!=='all'&&SCOPE_DEFS[k].test(j)); if(sk)$('fScope').value=sk;
+  openModal('jobModal');
+}
+function scopeFlags(scope){
+  return { is_nl:scope==='nl'||scope==='randstad'?1:0, is_spain:scope==='spain'?1:0,
+    is_be:scope==='benelux'?1:0, is_lu:0, is_ireland:scope==='ireland'?1:0,
+    is_europe:scope==='europe'?1:0 };
+}
+async function saveJob(){
+  const url=$('fUrl').value.trim(), company=$('fCompany').value.trim(), title=$('fTitle').value.trim();
+  if (!url||!company||!title){ alert('URL, empresa y puesto son obligatorios'); return; }
+  const body={
+    url, application_url:url, company, title,
+    location:$('fLocation').value.trim(), site:$('fSite').value.trim()||'manual',
+    fit_score:$('fFit').value!==''?parseInt($('fFit').value):null,
+    cv_version:$('fCv').value?parseInt($('fCv').value):null,
+    salary_text:$('fSalary').value.trim()||null, conditions_notes:$('fConditions').value.trim()||null,
+    blocking_language:$('fLang').value.trim()||null, user_notes:$('fNotes').value.trim()||null,
+    is_remote:$('fRemote').checked?1:0, is_senior:$('fSenior').checked?1:0, is_internship:$('fIntern').checked?1:0,
+    ...scopeFlags($('fScope').value),
+  };
+  if (EDIT_ID){
+    const { error }=await SB.from('jobs').update(body).eq('id', EDIT_ID);
+    if (error){ alert('Error: '+error.message); return; }
+  } else {
+    body.discovered_at=new Date().toISOString();
+    const { error }=await SB.from('jobs').insert(body);
+    if (error){ alert('Error: '+error.message); return; }
+  }
+  closeModal('jobModal'); await fetchJobs(); renderAll();
+}
+
+// ---- carta ----
+function openLetter(id){
+  const j=DATA.find(x=>x.id===id); if(!j) return;
+  if (!j.cl_text){ alert('La carta existe en el PC pero aún no se ha subido su texto (upload_letters.py).'); return; }
+  $('letterCompany').textContent=`${j.company||j.site} — ${j.title||''}`;
+  $('letterText').textContent=j.cl_text; openModal('letterModal');
+}
+// ---- plantillas de outreach (desde el perfil) ----
+function fillTpl(body,j){
+  return body.replaceAll('{company}',j?.company||j?.site||'[EMPRESA]')
+             .replaceAll('{role}',j?.title||'[PUESTO]')
+             .replaceAll('{name}','[NOMBRE]')
+             .replaceAll('{me}',PROFILE.full_name||'');
+}
+function copyTpl(id,tplId,btn){
+  const j=DATA.find(x=>x.id===id);
+  const tpl=(PROFILE.templates||[]).find(t=>t.id===tplId)||(PROFILE.templates||[])[0];
+  if (!tpl){ alert('No hay plantillas configuradas en tu perfil.'); return; }
+  copyText(fillTpl(tpl.body,j),btn);
+}
+function copyText(text,btn){
+  navigator.clipboard.writeText(text).then(()=>{ const o=btn.textContent; btn.textContent='✓ Copiado'; setTimeout(()=>btn.textContent=o,1500); });
+}
+
+// ---- modales ----
+function openModal(id){ $(id).classList.add('open'); }
+function closeModal(id){ $(id).classList.remove('open'); }
+
+// ============================ DASHBOARD (dataviz) ============================
+// Gráficos de una sola serie -> tono de acento del usuario; texto en tinta
+// neutra; KPIs como stat tiles. SVG inline, tema claro/oscuro por CSS vars.
+function svgBars(items, {horizontal=true, unit='', ordinal=false}={}){
+  if (!items.length) return '<div class="emptychart">Sin datos todavía.</div>';
+  const max=Math.max(...items.map(i=>i.value),1);
+  if (horizontal){
+    const rowH=30, gap=8, W=340, labelW=118, barMax=W-labelW-42, H=items.length*(rowH+gap);
+    return `<svg viewBox="0 0 ${W} ${H}" role="img">${items.map((it,i)=>{
+      const y=i*(rowH+gap), w=Math.max(2,(it.value/max)*barMax);
+      const shade=ordinal?0.55+0.45*(1-i/Math.max(items.length-1,1)):1;
+      return `<g><title>${esc(it.label)}: ${it.value}${unit}</title>
+        <text x="0" y="${y+rowH/2}" dominant-baseline="middle" font-size="12" fill="var(--ink2)">${esc(it.label)}</text>
+        <rect x="${labelW}" y="${y+4}" width="${w}" height="${rowH-8}" rx="4" fill="var(--accent)" opacity="${shade}"/>
+        <text x="${labelW+w+6}" y="${y+rowH/2}" dominant-baseline="middle" font-size="12" font-weight="700" fill="var(--ink)">${it.value}${unit}</text>
+      </g>`;
+    }).join('')}</svg>`;
+  } else {
+    const W=340, H=170, padB=26, padL=6, colGap=6, n=items.length;
+    const colW=(W-padL)/n - colGap, barMax=H-padB-14;
+    return `<svg viewBox="0 0 ${W} ${H}" role="img">${items.map((it,i)=>{
+      const x=padL+i*((W-padL)/n), h=Math.max(2,(it.value/max)*barMax), y=H-padB-h;
+      return `<g><title>${esc(it.label)}: ${it.value}${unit}</title>
+        <rect x="${x}" y="${y}" width="${colW}" height="${h}" rx="4" fill="var(--accent)"/>
+        ${it.value>0?`<text x="${x+colW/2}" y="${y-4}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${it.value}</text>`:''}
+        <text x="${x+colW/2}" y="${H-10}" text-anchor="middle" font-size="10" fill="var(--ink2)">${esc(it.label)}</text>
+      </g>`;
+    }).join('')}</svg>`;
+  }
+}
+function weeklyData(){
+  const weeks=[]; const now=new Date(); const monday=new Date(now); monday.setDate(now.getDate()-((now.getDay()+6)%7)); monday.setHours(0,0,0,0);
+  for (let i=9;i>=0;i--){ const start=new Date(monday); start.setDate(monday.getDate()-i*7); weeks.push({start, count:0, label:(start.getDate()+'/'+(start.getMonth()+1))}); }
+  DATA.filter(j=>j.applied_at).forEach(j=>{
+    const t=new Date(j.applied_at).getTime();
+    for (let i=0;i<weeks.length;i++){ const s=weeks[i].start.getTime(), e=s+7*86400e3; if (t>=s&&t<e){ weeks[i].count++; break; } }
+  });
+  return weeks.map(w=>({label:w.label, value:w.count}));
+}
+function renderDash(){
+  renderKpis();
+  const funnel=[
+    {label:'Descubiertas', value:DATA.length},
+    {label:'Aplicadas', value:DATA.filter(j=>j.applied_at).length},
+    {label:'En proceso', value:DATA.filter(j=>['entrevista','en_proceso'].includes(j.response_status)).length},
+    {label:'Oferta', value:DATA.filter(j=>j.response_status==='oferta').length},
+  ];
+  const bySite=Object.entries(DATA.reduce((m,j)=>{const s=j.site||'—';m[s]=(m[s]||0)+1;return m;},{}))
+    .map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,8);
+  const byFit=[];
+  for (let f=10;f>=4;f--) byFit.push({label:String(f), value:DATA.filter(j=>(j.fit_score??-1)===f).length});
+  const k=computeKpis();
+  $('dash').innerHTML=`
+    <div class="dash-grid">
+      <div class="card"><h3>🎯 Embudo de candidaturas</h3>${svgBars(funnel,{horizontal:true,ordinal:true})}</div>
+      <div class="card"><h3>📈 Aplicaciones por semana <span class="sub">(últimas 10)</span></h3>${svgBars(weeklyData(),{horizontal:false})}</div>
+      <div class="card"><h3>📰 Ofertas por fuente</h3>${svgBars(bySite,{horizontal:true})}</div>
+      <div class="card"><h3>⚖️ Distribución por fit</h3>${svgBars(byFit,{horizontal:false})}</div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3>Resumen</h3>
+      <div style="font-size:13px;color:var(--ink2);line-height:1.9">
+        <b style="color:var(--ink)">${k.applied}</b> candidaturas enviadas ·
+        <b style="color:var(--ink)">${k.week}</b> esta semana ·
+        <b style="color:var(--ink)">${k.month}</b> este mes<br>
+        <b style="color:var(--green)">${k.interviews}</b> en proceso/entrevista (tasa de respuesta <b style="color:var(--green)">${k.resp_rate}%</b>) ·
+        <b>${k.waiting}</b> esperando respuesta ·
+        <b style="color:var(--danger)">${k.rejected}</b> rechazos<br>
+        <b style="color:var(--accent)">${k.queue}</b> ofertas listas para aplicar (fit ≥ 8, sin bloqueos).
+      </div>
+    </div>`;
+}
+
+load();
+</script>
+</body>
+</html>

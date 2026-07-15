@@ -75,10 +75,13 @@ def login(email, password):
         return json.loads(r.read())["access_token"]
 
 
-def fetch_jobs(token, table):
+def fetch_jobs(token, table, id_col="rowid"):
+    # Aliasa la columna de id a "rowid" para que el resto del script no cambie
+    # (la tabla multi-tenant "jobs" usa "id"; las antiguas usan "rowid").
+    sel = f"rowid:{id_col}" if id_col != "rowid" else "rowid"
     jobs, offset = [], 0
     while True:
-        page = api(f"/rest/v1/{table}?select=rowid,url,company,title,cl_exists,cl_text"
+        page = api(f"/rest/v1/{table}?select={sel},url,company,title,cl_exists,cl_text"
                    f"&limit=1000&offset={offset}", token)
         jobs += page
         if len(page) < 1000:
@@ -147,7 +150,11 @@ def main():
     ap.add_argument("--email", default=DEFAULT_EMAIL)
     ap.add_argument("--table", default="applyboard_jobs",
                     help="Tabla de Supabase (applyboard_jobs para Carlos, "
-                         "applyboard_jobs_alejandra para Alejandra)")
+                         "applyboard_jobs_alejandra para Alejandra, "
+                         "jobs para el producto multi-tenant nuevo)")
+    ap.add_argument("--id-col", default="rowid",
+                    help="Columna de id de la tabla (rowid en las antiguas, "
+                         "id en la tabla multi-tenant 'jobs')")
     args = ap.parse_args()
 
     base = Path(args.dir)
@@ -161,7 +168,7 @@ def main():
                  "'carta', 'cover', 'letter', 'motivation' o 'cl').")
 
     token = login(args.email, getpass.getpass(f"Contraseña del dashboard ({args.email}): "))
-    jobs = fetch_jobs(token, args.table)
+    jobs = fetch_jobs(token, args.table, args.id_col)
     print(f"{len(jobs)} ofertas en Supabase, {sum(1 for j in jobs if j.get('cl_exists'))} con cl_exists=1")
 
     pending = [j for j in jobs if args.force or not j.get("cl_text")]
