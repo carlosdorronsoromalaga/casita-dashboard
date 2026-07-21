@@ -342,6 +342,10 @@ function buildScopeSelectors(){
   $('fScope').innerHTML = scopes.filter(k=>k!=='all').map(k=>`<option value="${k}">${SCOPE_DEFS[k].label}</option>`).join('')+'<option value="other">Otro</option>';
   $('fCv').innerHTML = '<option value="">CV ?</option>'+Object.entries(cvLabels()).map(([n,l])=>`<option value="${n}">${esc(l)}</option>`).join('');
 }
+// 21/07: se unifican "descartadas" (yo las rechazo) y "rechazadas" (la empresa
+// me rechaza) en UNA sola pestana "❌ Rechazadas" -> todo lo que esta fuera del
+// pipeline activo. El boton de la tarjeta pasa a "❌ Rechazar" en vez de
+// "🗑 Descartar". El 🗑 se reserva para eliminar de verdad (papelera).
 const TABS = [
   { id:'dash',     label:'📊 Dashboard' },
   { id:'queue',    label:'🎯 Aplicar ahora' },
@@ -350,7 +354,6 @@ const TABS = [
   { id:'applied',  label:'📤 Aplicadas' },
   { id:'rejected', label:'❌ Rechazadas' },
   { id:'followup', label:'⏰ Follow-ups' },
-  { id:'skipped',  label:'🗑 Descartadas' },
   { id:'all',      label:'Todas' },
 ];
 function buildTabs(){
@@ -386,17 +389,17 @@ function visible(){
   const q=$('q').value.toLowerCase(), site=$('site').value, sort=$('sort').value;
   let out = DATA.filter(j=>{
     const applied=!!j.applied_at, skipped=j.apply_status==='skipped';
-    const rejected = j.response_status==='rechazo';
+    // "Rechazada" = la empresa me rechazo (rechazo) O yo la rechace (skipped)
+    const rejected = j.response_status==='rechazo' || skipped;
     if (TAB==='queue'   && (applied||skipped)) return false;
     if (TAB==='sector'  && (applied||skipped||!isSector(j))) return false;
     if (TAB==='starred' && !(j.starred&&!applied)) return false;
-    if (TAB==='applied' && !(applied&&!rejected)) return false;
+    if (TAB==='applied' && !(applied&&j.response_status!=='rechazo')) return false;
     if (TAB==='rejected'&& !rejected) return false;
     if (TAB==='followup'){
       const d=daysAgo(j.applied_at);
       if (!(applied && d>=7 && !j.followup_sent_at && (!j.response_status||j.response_status==='sin_respuesta'))) return false;
     }
-    if (TAB==='skipped' && !skipped) return false;
     if (['queue','sector','all'].includes(TAB) && !passesCommon(j)) return false;
     if (site && j.site!==site) return false;
     if (q && !((j.title||'').toLowerCase().includes(q)||(j.company||'').toLowerCase().includes(q))) return false;
@@ -509,7 +512,7 @@ function card(j){
       <button onclick="this.closest('.job').querySelector('.reasoning').classList.toggle('open')">🧠 Por qué</button>
       <button class="${j.starred?'staron':''}" onclick="update(${j.id},{starred:${j.starred?0:1}})">⭐</button>
       ${!applied?`<button class="applybtn" onclick="if(confirm('¿Marcar como APLICADA?'))update(${j.id},{applied_at:'now',apply_status:'applied'})">✅ Aplicada</button>`:''}
-      ${!applied?`<button class="danger" onclick="update(${j.id},{apply_status:${j.apply_status==='skipped'?'null':"'skipped'"}})">${j.apply_status==='skipped'?'↩ Recuperar':'🗑 Descartar'}</button>`:''}
+      ${!applied?`<button class="danger" onclick="update(${j.id},{apply_status:${j.apply_status==='skipped'?'null':"'skipped'"}})">${j.apply_status==='skipped'?'↩ Recuperar':'❌ Rechazar'}</button>`:''}
       <button onclick="openEdit(${j.id})">✏️ Editar</button>
       <button class="danger" onclick="softDelete(${j.id})">🗑 Eliminar</button>
       ${resp}
