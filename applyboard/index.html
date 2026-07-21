@@ -193,6 +193,10 @@ const $ = id => document.getElementById(id);
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const validUrl = v => { const s=(v==null?'':String(v)).trim(); return (!s||['none','null','undefined'].includes(s.toLowerCase()))?null:s; };
 const daysAgo = iso => iso ? Math.floor((Date.now()-new Date(iso).getTime())/86400e3) : null;
+// "Consiguio entrevista": muchas entrevistas del historico estan marcadas en
+// las NOTAS con "ENTREVISTA" (aunque luego acabaran en rechazo), no en el
+// campo response_status. Contar ambas cosas -> el nº real de entrevistas.
+const reachedInterview = j => /entrevista/i.test(j.user_notes||'') || ['entrevista','en_proceso','oferta'].includes(j.response_status);
 
 // temas de acento (configurables por usuario en profiles.theme)
 const THEMES = {
@@ -226,11 +230,9 @@ const SCOPE_DEFS = {
   ireland:  { label:'🇮🇪 Irlanda', test:j=>j.is_ireland },
   remote:   { label:'🏠 Remoto', test:j=>j.is_remote },
 };
-// Generico de verdad: solo categorias amplias, ningun pais/ciudad especifico
-// de un usuario concreto (antes tenia randstad/benelux, que son la geografia
-// de Alejandra -- Carlos las veia como "esto es de otra persona"). Los
-// paises/ciudades propios de cada quien viven en profiles.scopes via onboarding.
-const DEFAULT_SCOPES = ['all','europe','remote'];
+// Sin lista hardcodeada de ambitos por defecto: si el perfil no define scopes
+// (todavia sin onboarding), se derivan de los datos reales del usuario (ver
+// userScopes) -> cada quien ve las geografias que existen en SUS ofertas.
 
 // palabras clave de sector -> regex dinámica (profiles.sector_keywords)
 function sectorRe(){
@@ -321,13 +323,23 @@ async function load(){
 
 // ============================ estructura UI ============================
 function userScopes(){
-  const s = (PROFILE?.scopes && PROFILE.scopes.length) ? PROFILE.scopes : DEFAULT_SCOPES;
-  return s.filter(k=>SCOPE_DEFS[k]);
+  if (PROFILE?.scopes && PROFILE.scopes.length) return PROFILE.scopes.filter(k=>SCOPE_DEFS[k]);
+  // Sin scopes en el perfil: derivar de los datos REALES -> el usuario ve
+  // exactamente las geografias que aparecen en SUS ofertas, sin heredar la
+  // lista de otra persona. 'all' siempre; 'remote' si hay algo remoto.
+  const keys=['all'];
+  for (const k of ['spain','nl','randstad','benelux','ireland','europe']){
+    if (DATA.some(j=>SCOPE_DEFS[k].test(j))) keys.push(k);
+  }
+  if (DATA.some(j=>j.is_remote)) keys.push('remote');
+  return keys;
 }
 function buildScopeSelectors(){
-  const opts = userScopes().map(k=>`<option value="${k}">${SCOPE_DEFS[k].label}</option>`).join('');
-  $('scope').innerHTML = opts;
-  $('fScope').innerHTML = userScopes().filter(k=>k!=='all').map(k=>`<option value="${k}">${SCOPE_DEFS[k].label}</option>`).join('')+'<option value="other">Otro</option>';
+  const prev = $('scope').value;               // preservar seleccion al reconstruir
+  const scopes = userScopes();
+  $('scope').innerHTML = scopes.map(k=>`<option value="${k}">${SCOPE_DEFS[k].label}</option>`).join('');
+  if (scopes.includes(prev)) $('scope').value = prev;
+  $('fScope').innerHTML = scopes.filter(k=>k!=='all').map(k=>`<option value="${k}">${SCOPE_DEFS[k].label}</option>`).join('')+'<option value="other">Otro</option>';
   $('fCv').innerHTML = '<option value="">CV ?</option>'+Object.entries(cvLabels()).map(([n,l])=>`<option value="${n}">${esc(l)}</option>`).join('');
 }
 const TABS = [
@@ -402,7 +414,7 @@ function computeKpis(){
   const week=new Date(Date.now()-7*86400e3).toISOString();
   const now=new Date(), monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString();
   const applied=DATA.filter(j=>j.applied_at);
-  const interviews=DATA.filter(j=>['entrevista','en_proceso','oferta'].includes(j.response_status));
+  const interviews=DATA.filter(reachedInterview);
   return {
     applied:applied.length,
     week:applied.filter(j=>j.applied_at>=week).length,
@@ -427,6 +439,7 @@ function renderKpis(){
 
 // ============================ render principal ============================
 function renderAll(){
+  buildScopeSelectors();   // ahora DATA ya esta cargado -> scopes derivados de datos reales
   renderKpis();
   const sites=[...new Set(DATA.map(j=>j.site).filter(Boolean))].sort();
   $('site').innerHTML='<option value="">Todas las fuentes</option>'+sites.map(s=>`<option>${esc(s)}</option>`).join('');
@@ -670,7 +683,7 @@ function renderDash(){
   const funnel=[
     {label:'Descubiertas', value:DATA.length},
     {label:'Aplicadas', value:DATA.filter(j=>j.applied_at).length},
-    {label:'En proceso', value:DATA.filter(j=>['entrevista','en_proceso'].includes(j.response_status)).length},
+    {label:'Entrevista', value:DATA.filter(reachedInterview).length},
     {label:'Oferta', value:DATA.filter(j=>j.response_status==='oferta').length},
   ];
   const bySite=Object.entries(DATA.reduce((m,j)=>{const s=j.site||'—';m[s]=(m[s]||0)+1;return m;},{}))
@@ -691,7 +704,7 @@ function renderDash(){
         <b style="color:var(--ink)">${k.applied}</b> candidaturas enviadas ·
         <b style="color:var(--ink)">${k.week}</b> esta semana ·
         <b style="color:var(--ink)">${k.month}</b> este mes<br>
-        <b style="color:var(--green)">${k.interviews}</b> en proceso/entrevista (tasa de respuesta <b style="color:var(--green)">${k.resp_rate}%</b>) ·
+        <b style="color:var(--green)">${k.interviews}</b> entrevistas conseguidas (tasa <b style="color:var(--green)">${k.resp_rate}%</b>) ·
         <b>${k.waiting}</b> esperando respuesta ·
         <b style="color:var(--danger)">${k.rejected}</b> rechazos<br>
         <b style="color:var(--accent)">${k.queue}</b> ofertas listas para aplicar (fit ≥ 8, sin bloqueos).
