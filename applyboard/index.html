@@ -288,15 +288,25 @@ function toggleTheme(){
 // ámbitos geográficos: la lógica (test) vive en código (seguro); QUÉ ámbitos
 // aparecen y en qué orden es dato por usuario (profiles.scopes).
 const RANDSTAD_RE = /amsterdam|rotterdam|den haag|the hague|utrecht|amstelveen|haarlem|leiden|delft|schiphol|hoofddorp|zoetermeer|hilversum|almere/i;
+const cityRe = re => j => re.test(j.location||'');
 const SCOPE_DEFS = {
   all:      { label:'🌍 Todos', test:()=>true },
+  // países / regiones
   spain:    { label:'🇪🇸 España', test:j=>j.is_spain },
   nl:       { label:'🇳🇱 Países Bajos', test:j=>j.is_nl },
-  randstad: { label:'🇳🇱 Randstad', test:j=>j.is_nl && RANDSTAD_RE.test(j.location||'') },
   benelux:  { label:'🇧🇪🇱🇺 Benelux', test:j=>j.is_be||j.is_lu },
   europe:   { label:'🇪🇺 Europa', test:j=>j.is_europe||(j.is_remote&&!j.is_us) },
   ireland:  { label:'🇮🇪 Irlanda', test:j=>j.is_ireland },
   remote:   { label:'🏠 Remoto', test:j=>j.is_remote },
+  // ciudades (match sobre location) — se eligen por usuario en profiles.scopes
+  madrid:    { label:'📍 Madrid', test:cityRe(/madrid/i) },
+  barcelona: { label:'📍 Barcelona', test:cityRe(/barcelona/i) },
+  amsterdam: { label:'📍 Ámsterdam', test:cityRe(/amsterdam/i) },
+  randstad:  { label:'📍 Randstad', test:j=>j.is_nl && RANDSTAD_RE.test(j.location||'') },
+  rotterdam: { label:'📍 Rotterdam', test:cityRe(/rotterdam/i) },
+  valencia:  { label:'📍 Valencia', test:cityRe(/valencia/i) },
+  luxembourg:{ label:'📍 Luxemburgo', test:j=>j.is_lu },
+  dublin:    { label:'📍 Dublín', test:cityRe(/dublin/i) },
 };
 // Sin lista hardcodeada de ambitos por defecto: si el perfil no define scopes
 // (todavia sin onboarding), se derivan de los datos reales del usuario (ver
