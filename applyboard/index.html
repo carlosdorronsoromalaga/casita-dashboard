@@ -5,105 +5,173 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ApplyBoard</title>
 <style>
-  /* Tema oscuro por defecto; el acento (--accent*) lo fija el perfil del
-     usuario en runtime. Todo lo específico de persona vive en la BD, no aquí. */
+  /* Sistema de diseño ApplyBoard. Tema claro/oscuro por CSS vars; el acento
+     (--accent*) lo fija el perfil del usuario en runtime. Neutros con un
+     ligero sesgo frío (azul-gris) para que se lean "elegidos", no por defecto. */
   :root {
-    --bg:#0f1216; --panel:#171b21; --panel2:#1f242c; --line:#2a3038;
-    --text:#e7edf3; --muted:#8a95a3; --danger:#f87171; --green:#4ade80;
-    --gold:#fbbf24; --red:#f87171;
+    --bg:#0b0e13; --panel:#141922; --panel2:#1b212c; --panel3:#222a36;
+    --line:#262e3a; --line2:#313b49;
+    --text:#eaf0f7; --muted:#93a1b3; --faint:#69788c;
+    --danger:#f77066; --green:#48d17f; --gold:#f5b83e;
     --accent:#3987e5; --accent-soft:#6da7ec; --accent-strong:#1c5cab; --accent-ink:#fff;
-    /* superficies de gráfico (dataviz) */
-    --surface:#171b21; --grid:#252b33; --axis:#333b45;
-    --ink:#e7edf3; --ink2:#8a95a3;
+    --accent-wash:rgba(57,135,229,.12);
+    --ink:#eaf0f7; --ink2:#93a1b3; --grid:#232b37;
+    --radius:14px; --radius-sm:9px;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.22);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.25);
+    --font:'Segoe UI',system-ui,-apple-system,BlinkMacSystemFont,'Inter',sans-serif;
   }
   :root[data-theme="light"] {
-    --bg:#f4f5f7; --panel:#ffffff; --panel2:#f0f2f5; --line:#e2e5ea;
-    --text:#111418; --muted:#6b7280; --surface:#ffffff; --grid:#eceef1; --axis:#cbd0d6;
-    --ink:#111418; --ink2:#6b7280;
+    --bg:#f6f7f9; --panel:#ffffff; --panel2:#f2f4f7; --panel3:#e9edf2;
+    --line:#e4e8ee; --line2:#d6dce4;
+    --text:#141a22; --muted:#5b6675; --faint:#8a94a3;
+    --danger:#dc4c40; --green:#1f9d5b; --gold:#c98a12;
+    --accent-wash:rgba(57,135,229,.10);
+    --ink:#141a22; --ink2:#5b6675; --grid:#eef1f5;
+    --shadow:0 1px 2px rgba(20,26,34,.06), 0 6px 20px rgba(20,26,34,.06);
+    --shadow-sm:0 1px 2px rgba(20,26,34,.05);
   }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,'Segoe UI',sans-serif; }
-  header { padding:12px 22px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-           border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:500; }
-  header h1 { font-size:18px; color:var(--accent); display:flex; align-items:center; gap:8px; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font);
+         font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  button, input, select, textarea { font-family:inherit; }
+  ::selection { background:var(--accent-wash); }
+
+  /* header */
+  header { padding:11px 24px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+           border-bottom:1px solid var(--line); position:sticky; top:0;
+           background:color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter:blur(10px); z-index:500; }
+  header h1 { font-size:16px; font-weight:700; letter-spacing:-.01em; color:var(--text);
+              display:flex; align-items:center; gap:8px; }
+  header h1 .dot { width:9px; height:9px; border-radius:50%; background:var(--accent);
+                   box-shadow:0 0 0 4px var(--accent-wash); }
   .hbtn { background:var(--panel2); color:var(--text); border:1px solid var(--line);
-          border-radius:8px; padding:6px 11px; font-size:13px; cursor:pointer; }
-  .hbtn:hover { border-color:var(--accent); }
+          border-radius:var(--radius-sm); padding:6px 11px; font-size:13px; cursor:pointer;
+          transition:border-color .15s, background .15s; display:inline-flex; align-items:center; gap:6px; }
+  .hbtn:hover { border-color:var(--line2); background:var(--panel3); }
   .spacer { margin-left:auto; }
+
+  /* KPI stat tiles en el header */
   .kpis { display:flex; gap:8px; flex-wrap:wrap; }
-  .kpi { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px 13px; text-align:center; }
-  .kpi .n { font-size:16px; font-weight:700; color:var(--accent); }
-  .kpi .l { font-size:10px; color:var(--muted); }
-  .kpi.good .n { color:var(--green); } .kpi.bad .n { color:var(--danger); }
-  .tabs { display:flex; gap:6px; padding:12px 22px 0; flex-wrap:wrap; }
-  .tab { background:var(--panel); border:1px solid var(--line); color:var(--muted); border-radius:999px;
-         padding:6px 14px; font-size:13px; cursor:pointer; }
-  .tab.active { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:600; }
-  .controls { display:flex; gap:8px; padding:12px 22px; flex-wrap:wrap; align-items:center;
-              background:var(--panel); border-bottom:1px solid var(--line); }
-  .controls input, .controls select { background:var(--panel2); color:var(--text);
-    border:1px solid var(--line); border-radius:8px; padding:7px 10px; font-size:13px; outline:none; }
-  .controls input:focus, .controls select:focus { border-color:var(--accent); }
-  .toggle { color:var(--muted); font-size:12px; display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+  .kpi { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-sm);
+         padding:6px 13px; text-align:left; min-width:64px; box-shadow:var(--shadow-sm); }
+  .kpi .n { font-size:16px; font-weight:750; letter-spacing:-.02em; color:var(--text);
+            font-variant-numeric:tabular-nums; }
+  .kpi .l { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:1px; }
+  .kpi.accent .n { color:var(--accent); } .kpi.good .n { color:var(--green); } .kpi.bad .n { color:var(--danger); }
+
+  /* tabs */
+  .tabs { display:flex; gap:4px; padding:12px 24px 0; flex-wrap:wrap; }
+  .tab { background:transparent; border:1px solid transparent; color:var(--muted);
+         border-radius:var(--radius-sm); padding:6px 13px; font-size:13px; font-weight:500;
+         cursor:pointer; transition:background .15s, color .15s; }
+  .tab:hover { background:var(--panel2); color:var(--text); }
+  .tab.active { background:var(--accent); color:var(--accent-ink); font-weight:600;
+                box-shadow:0 2px 8px var(--accent-wash); }
+
+  /* controles */
+  .controls { display:flex; gap:8px; padding:12px 24px; flex-wrap:wrap; align-items:center;
+              border-bottom:1px solid var(--line); }
+  .controls input, .controls select { background:var(--panel); color:var(--text);
+    border:1px solid var(--line); border-radius:var(--radius-sm); padding:7px 11px; font-size:13px;
+    outline:none; transition:border-color .15s, box-shadow .15s; }
+  .controls input:focus, .controls select:focus { border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-wash); }
+  .toggle { color:var(--muted); font-size:12.5px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
   .toggle input { accent-color:var(--accent); }
-  #count { color:var(--muted); font-size:13px; margin-left:auto; }
-  #list { padding:16px 22px; display:flex; flex-direction:column; gap:12px; max-width:1000px; margin:auto; }
-  .job { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
-  .job.starred { border-color:var(--gold); }
-  .job.applied { border-left:4px solid var(--green); }
+  #count { color:var(--faint); font-size:12.5px; margin-left:auto; font-variant-numeric:tabular-nums; }
+
+  /* lista de ofertas */
+  #list { padding:18px 24px 60px; display:flex; flex-direction:column; gap:11px; max-width:1000px; margin:auto; }
+  .job { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+         padding:15px 17px; box-shadow:var(--shadow-sm); transition:border-color .15s, box-shadow .15s; }
+  .job:hover { border-color:var(--line2); box-shadow:var(--shadow); }
+  .job.starred { border-color:color-mix(in srgb, var(--gold) 55%, var(--line)); }
+  .job.applied { border-left:3px solid var(--green); }
   .job-top { display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
-  .fit { font-size:22px; font-weight:800; color:var(--accent); min-width:40px; }
+  .fit { font-size:21px; font-weight:800; letter-spacing:-.03em; color:var(--accent);
+         min-width:38px; font-variant-numeric:tabular-nums; }
   .fit.high { color:var(--green); }
-  .co { font-weight:700; font-size:15px; }
-  .ti { font-size:14px; color:var(--text); flex:1 1 100%; margin-top:2px; }
-  .meta { color:var(--muted); font-size:12px; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  .chip { background:var(--panel2); border-radius:5px; padding:1px 7px; font-size:11px; color:var(--muted); }
-  .chip.on { color:var(--green); }
-  .chip.warn { color:var(--gold); }
-  .btns { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+  .fit.low { color:var(--faint); }
+  .co { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .ti { font-size:13.5px; color:var(--muted); flex:1 1 100%; margin-top:1px; }
+  .meta { color:var(--muted); font-size:12px; margin-top:8px; display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
+  .chip { background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:2px 8px;
+          font-size:11px; color:var(--muted); font-weight:500; }
+  .chip.on { color:var(--green); border-color:color-mix(in srgb,var(--green) 30%, var(--line)); background:color-mix(in srgb,var(--green) 8%, transparent); }
+  .chip.warn { color:var(--gold); border-color:color-mix(in srgb,var(--gold) 30%, var(--line)); background:color-mix(in srgb,var(--gold) 8%, transparent); }
+  .btns { display:flex; gap:7px; margin-top:12px; flex-wrap:wrap; align-items:center; }
   .btns a, .btns button { background:var(--panel2); border:1px solid var(--line); color:var(--text);
-    border-radius:8px; padding:6px 12px; font-size:12.5px; cursor:pointer; text-decoration:none; }
-  .btns a:hover, .btns button:hover { border-color:var(--accent); }
+    border-radius:var(--radius-sm); padding:6px 12px; font-size:12.5px; font-weight:500; cursor:pointer;
+    text-decoration:none; transition:border-color .15s, background .15s; }
+  .btns a:hover, .btns button:hover { border-color:var(--line2); background:var(--panel3); }
   .btns .primary { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
-  .btns .applybtn { background:var(--green); border-color:var(--green); color:#06220f; font-weight:700; }
-  .btns button.staron { color:var(--gold); border-color:var(--gold); }
+  .btns .primary:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
+  .btns .applybtn { background:color-mix(in srgb,var(--green) 15%, transparent); border-color:color-mix(in srgb,var(--green) 40%, var(--line)); color:var(--green); font-weight:600; }
+  .btns .applybtn:hover { background:color-mix(in srgb,var(--green) 25%, transparent); }
+  .btns button.staron { color:var(--gold); border-color:color-mix(in srgb,var(--gold) 45%, var(--line)); }
   .btns .danger { color:var(--danger); }
-  .btns select { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:12.5px; }
-  .reasoning { display:none; background:var(--panel2); border-radius:8px; padding:10px 12px;
-               font-size:12.5px; color:var(--muted); margin-top:10px; white-space:pre-wrap; }
+  .btns .danger:hover { border-color:color-mix(in srgb,var(--danger) 45%, var(--line)); }
+  .btns select { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:var(--radius-sm); padding:6px 8px; font-size:12.5px; }
+  .reasoning { display:none; background:var(--panel2); border:1px solid var(--line); border-radius:var(--radius-sm);
+               padding:11px 13px; font-size:12.5px; color:var(--muted); margin-top:11px; white-space:pre-wrap; line-height:1.55; }
   .reasoning.open { display:block; }
   .reasoning b { color:var(--text); }
-  .notes { width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:8px;
-           color:var(--text); font-size:12px; padding:7px 10px; resize:vertical; outline:none; margin-top:10px; min-height:30px; }
-  .when { color:var(--muted); font-size:12px; }
-  #empty { text-align:center; color:var(--muted); padding:60px; }
+  .notes { width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:var(--radius-sm);
+           color:var(--text); font-size:12.5px; padding:8px 11px; resize:vertical; outline:none; margin-top:11px; min-height:32px; }
+  .notes:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash); }
+  .when { color:var(--faint); font-size:12px; }
+  #empty { text-align:center; color:var(--muted); padding:70px 20px; font-size:14px; }
+  #empty .big { font-size:34px; margin-bottom:10px; opacity:.5; }
+
   /* modales */
-  .modal { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:700; display:none; overflow:auto; padding:30px 16px; }
+  .modal { position:fixed; inset:0; background:rgba(4,7,12,.62); z-index:700; display:none; overflow:auto; padding:34px 16px; backdrop-filter:blur(3px); }
   .modal.open { display:block; }
-  .modal-inner { background:var(--panel); border-radius:12px; max-width:520px; margin:auto; padding:20px; border:1px solid var(--line); }
-  .modal-inner h2 { color:var(--accent); font-size:18px; margin-bottom:12px; }
-  .modal-close { float:right; background:var(--panel2); color:var(--text); border:none; border-radius:8px; padding:6px 12px; cursor:pointer; }
-  .form label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
+  .modal-inner { background:var(--panel); border-radius:var(--radius); max-width:520px; margin:auto; padding:22px; border:1px solid var(--line); box-shadow:var(--shadow); }
+  .modal-inner h2 { font-size:17px; font-weight:700; letter-spacing:-.01em; margin-bottom:14px; }
+  .modal-close { float:right; background:var(--panel2); color:var(--muted); border:1px solid var(--line); border-radius:var(--radius-sm); width:30px; height:30px; cursor:pointer; }
+  .form label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; font-weight:500; }
   .form input, .form select, .form textarea { width:100%; background:var(--panel2); color:var(--text);
-    border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; outline:none; }
+    border:1px solid var(--line); border-radius:var(--radius-sm); padding:8px 11px; font-size:13px; outline:none; }
+  .form input:focus, .form select:focus, .form textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash); }
   .form .row { display:flex; gap:10px; } .form .row > div { flex:1; }
-  .form .flags { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
-  .form button.save { margin-top:14px; background:var(--accent); color:var(--accent-ink); border:none;
-    border-radius:8px; padding:10px 18px; font-weight:700; cursor:pointer; }
-  /* dashboard */
-  #dash { padding:18px 22px; max-width:1080px; margin:auto; display:none; }
-  .dash-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:14px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
-  .card h3 { font-size:13px; color:var(--muted); font-weight:600; margin-bottom:14px; letter-spacing:.02em; }
-  .card .sub { font-size:11px; color:var(--muted); font-weight:400; }
+  .form .flags { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
+  .form button.save { margin-top:16px; background:var(--accent); color:var(--accent-ink); border:none;
+    border-radius:var(--radius-sm); padding:10px 18px; font-weight:600; cursor:pointer; }
+  .form button.save:hover { background:var(--accent-strong); }
+
+  /* ===================== DASHBOARD ===================== */
+  #dash { padding:20px 24px 60px; max-width:1120px; margin:auto; display:none; }
+  .dash-hero { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px; }
+  .stat { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+          padding:15px 16px; box-shadow:var(--shadow-sm); position:relative; overflow:hidden;
+          cursor:default; transition:border-color .15s, transform .15s; }
+  .stat.clk { cursor:pointer; } .stat.clk:hover { border-color:var(--accent); transform:translateY(-1px); }
+  .stat .v { font-size:27px; font-weight:800; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1; }
+  .stat .k { font-size:11.5px; color:var(--muted); margin-top:6px; text-transform:uppercase; letter-spacing:.04em; }
+  .stat .sub2 { font-size:11px; color:var(--faint); margin-top:3px; }
+  .stat.good .v { color:var(--green); } .stat.bad .v { color:var(--danger); } .stat.accent .v { color:var(--accent); }
+  .dash-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+          padding:17px 18px; box-shadow:var(--shadow-sm); }
+  .card.span2 { grid-column:1 / -1; }
+  .card h3 { font-size:12.5px; color:var(--muted); font-weight:600; margin-bottom:16px;
+             text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:8px; }
+  .card h3 .sub { font-size:11px; color:var(--faint); font-weight:400; text-transform:none; letter-spacing:0; }
   svg { display:block; width:100%; height:auto; overflow:visible; }
-  .emptychart { color:var(--muted); font-size:12px; padding:20px 0; text-align:center; }
-  @media (max-width:640px){ #list{padding:12px} .kpis .kpi:nth-child(n+5){display:none} }
+  .emptychart { color:var(--faint); font-size:12.5px; padding:26px 0; text-align:center; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; font-size:12px; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .legend i { width:10px; height:10px; border-radius:3px; display:inline-block; }
+  .hbar-row { cursor:pointer; }
+  .hbar-row:hover rect.bar { opacity:.85; }
+  @media (max-width:640px){ #list{padding:14px} .kpis .kpi:nth-child(n+4){display:none}
+    header h1 span.name{display:none} }
 </style>
 </head>
 <body>
 <header>
-  <h1 id="brand">🎯 ApplyBoard</h1>
+  <h1 id="brand"><span class="dot"></span>ApplyBoard</h1>
   <button class="hbtn" onclick="openAdd()">➕ Añadir</button>
   <div class="kpis spacer" id="kpis"></div>
   <button class="hbtn" id="themeBtn" title="Modo claro/oscuro" onclick="toggleTheme()">🌙</button>
@@ -305,7 +373,7 @@ async function boot(){
   PROFILE = await loadProfile();
   if (!PROFILE) return;
   applyTheme(PROFILE.theme);
-  $('brand').innerHTML = `🎯 ApplyBoard${PROFILE.display_name?' · '+esc(PROFILE.display_name):''}`;
+  $('brand').innerHTML = `<span class="dot"></span>ApplyBoard${PROFILE.display_name?`<span class="name" style="color:var(--muted);font-weight:500"> · ${esc(PROFILE.display_name)}</span>`:''}`;
   document.title = 'ApplyBoard'+(PROFILE.display_name?' · '+PROFILE.display_name:'');
   buildScopeSelectors();
   buildTabs();
@@ -432,12 +500,10 @@ function computeKpis(){
 function renderKpis(){
   const k=computeKpis();
   $('kpis').innerHTML=`
+    <div class="kpi accent"><div class="n">${k.queue}</div><div class="l">cola lista</div></div>
     <div class="kpi"><div class="n">${k.applied}</div><div class="l">enviadas</div></div>
-    <div class="kpi"><div class="n">${k.week}</div><div class="l">esta semana</div></div>
-    <div class="kpi good"><div class="n">${k.interviews} · ${k.resp_rate}%</div><div class="l">entrevistas · tasa</div></div>
-    <div class="kpi"><div class="n">${k.waiting}</div><div class="l">esperando</div></div>
-    <div class="kpi bad"><div class="n">${k.rejected}</div><div class="l">rechazos</div></div>
-    <div class="kpi"><div class="n">${k.queue}</div><div class="l">cola lista</div></div>`;
+    <div class="kpi good"><div class="n">${k.interviews}</div><div class="l">entrevistas</div></div>
+    <div class="kpi"><div class="n">${k.waiting}</div><div class="l">esperando</div></div>`;
 }
 
 // ============================ render principal ============================
@@ -643,34 +709,62 @@ function openModal(id){ $(id).classList.add('open'); }
 function closeModal(id){ $(id).classList.remove('open'); }
 
 // ============================ DASHBOARD (dataviz) ============================
-// Gráficos de una sola serie -> tono de acento del usuario; texto en tinta
-// neutra; KPIs como stat tiles. SVG inline, tema claro/oscuro por CSS vars.
-function svgBars(items, {horizontal=true, unit='', ordinal=false}={}){
+// SVG inline, tema claro/oscuro por CSS vars, acento del usuario. Gráficos
+// interactivos: al hacer clic navegan a la lista ya filtrada.
+
+// barras horizontales; cada fila puede llevar onClick (navega a un filtro)
+function svgHBars(items, {ordinal=false, colorFn=null}={}){
+  if (!items.length || items.every(i=>!i.value)) return '<div class="emptychart">Sin datos todavía.</div>';
+  const max=Math.max(...items.map(i=>i.value),1);
+  const rowH=28, gap=9, W=360, labelW=104, barMax=W-labelW-44, H=items.length*(rowH+gap)-gap;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${items.map((it,i)=>{
+    const y=i*(rowH+gap), w=Math.max(it.value?3:0,(it.value/max)*barMax);
+    const fill=colorFn?colorFn(it):'var(--accent)';
+    const op=ordinal?(0.5+0.5*(1-i/Math.max(items.length-1,1))).toFixed(2):1;
+    return `<g class="${it.onClick?'hbar-row':''}" ${it.onClick?`onclick="${it.onClick}" style="cursor:pointer"`:''}>
+      <title>${esc(it.label)}: ${it.value}</title>
+      <text x="0" y="${y+rowH/2}" dominant-baseline="middle" font-size="12" fill="var(--ink2)">${esc(it.label)}</text>
+      <rect x="${labelW}" y="${y+3}" width="${barMax}" height="${rowH-6}" rx="5" fill="var(--panel2)"/>
+      <rect class="bar" x="${labelW}" y="${y+3}" width="${w}" height="${rowH-6}" rx="5" fill="${fill}" opacity="${op}"/>
+      <text x="${labelW+barMax+8}" y="${y+rowH/2}" dominant-baseline="middle" text-anchor="end" font-size="12.5" font-weight="700" fill="var(--ink)" style="text-anchor:start">${it.value}</text>
+    </g>`;
+  }).join('')}</svg>`;
+}
+// barras verticales (tendencia / distribución)
+function svgVBars(items, {colorFn=null}={}){
   if (!items.length) return '<div class="emptychart">Sin datos todavía.</div>';
   const max=Math.max(...items.map(i=>i.value),1);
-  if (horizontal){
-    const rowH=30, gap=8, W=340, labelW=118, barMax=W-labelW-42, H=items.length*(rowH+gap);
-    return `<svg viewBox="0 0 ${W} ${H}" role="img">${items.map((it,i)=>{
-      const y=i*(rowH+gap), w=Math.max(2,(it.value/max)*barMax);
-      const shade=ordinal?0.55+0.45*(1-i/Math.max(items.length-1,1)):1;
-      return `<g><title>${esc(it.label)}: ${it.value}${unit}</title>
-        <text x="0" y="${y+rowH/2}" dominant-baseline="middle" font-size="12" fill="var(--ink2)">${esc(it.label)}</text>
-        <rect x="${labelW}" y="${y+4}" width="${w}" height="${rowH-8}" rx="4" fill="var(--accent)" opacity="${shade}"/>
-        <text x="${labelW+w+6}" y="${y+rowH/2}" dominant-baseline="middle" font-size="12" font-weight="700" fill="var(--ink)">${it.value}${unit}</text>
-      </g>`;
-    }).join('')}</svg>`;
-  } else {
-    const W=340, H=170, padB=26, padL=6, colGap=6, n=items.length;
-    const colW=(W-padL)/n - colGap, barMax=H-padB-14;
-    return `<svg viewBox="0 0 ${W} ${H}" role="img">${items.map((it,i)=>{
-      const x=padL+i*((W-padL)/n), h=Math.max(2,(it.value/max)*barMax), y=H-padB-h;
-      return `<g><title>${esc(it.label)}: ${it.value}${unit}</title>
-        <rect x="${x}" y="${y}" width="${colW}" height="${h}" rx="4" fill="var(--accent)"/>
-        ${it.value>0?`<text x="${x+colW/2}" y="${y-4}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${it.value}</text>`:''}
-        <text x="${x+colW/2}" y="${H-10}" text-anchor="middle" font-size="10" fill="var(--ink2)">${esc(it.label)}</text>
-      </g>`;
-    }).join('')}</svg>`;
-  }
+  const W=360, H=150, padB=22, n=items.length, slot=W/n, colW=Math.min(30,slot*0.62), barMax=H-padB-16;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${items.map((it,i)=>{
+    const cx=slot*(i+0.5), h=Math.max(it.value?3:0,(it.value/max)*barMax), y=H-padB-h;
+    const fill=colorFn?colorFn(it):'var(--accent)';
+    return `<g ${it.onClick?`onclick="${it.onClick}" style="cursor:pointer"`:''}><title>${esc(it.label)}: ${it.value}</title>
+      <rect x="${cx-colW/2}" y="${y}" width="${colW}" height="${h}" rx="4" fill="${fill}"/>
+      ${it.value>0?`<text x="${cx}" y="${y-4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">${it.value}</text>`:''}
+      <text x="${cx}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--ink2)">${esc(it.label)}</text>
+    </g>`;
+  }).join('')}</svg>`;
+}
+// donut de estados de las candidaturas enviadas
+function svgDonut(segs){
+  const total=segs.reduce((s,x)=>s+x.value,0);
+  if (!total) return '<div class="emptychart">Aún no has aplicado a ninguna oferta.</div>';
+  const R=54, r=34, cx=64, cy=64; let a=-Math.PI/2;
+  const arcs=segs.filter(s=>s.value).map(s=>{
+    const frac=s.value/total, a2=a+frac*2*Math.PI;
+    const large=frac>0.5?1:0;
+    const x1=cx+R*Math.cos(a), y1=cy+R*Math.sin(a), x2=cx+R*Math.cos(a2), y2=cy+R*Math.sin(a2);
+    const xi2=cx+r*Math.cos(a2), yi2=cy+r*Math.sin(a2), xi1=cx+r*Math.cos(a), yi1=cy+r*Math.sin(a);
+    a=a2;
+    return `<path d="M${x1} ${y1} A${R} ${R} 0 ${large} 1 ${x2} ${y2} L${xi2} ${yi2} A${r} ${r} 0 ${large} 0 ${xi1} ${yi1} Z" fill="${s.color}" ${s.onClick?`onclick="${s.onClick}" style="cursor:pointer"`:''}><title>${esc(s.label)}: ${s.value}</title></path>`;
+  }).join('');
+  return `<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    <svg viewBox="0 0 128 128" style="width:128px;flex:0 0 auto">${arcs}
+      <text x="64" y="60" text-anchor="middle" font-size="24" font-weight="800" fill="var(--ink)" style="font-variant-numeric:tabular-nums">${total}</text>
+      <text x="64" y="78" text-anchor="middle" font-size="10" fill="var(--ink2)">enviadas</text></svg>
+    <div class="legend" style="flex-direction:column;gap:8px;margin-top:0">
+      ${segs.filter(s=>s.value).map(s=>`<span ${s.onClick?`onclick="${s.onClick}" style="cursor:pointer"`:''}><i style="background:${s.color}"></i>${esc(s.label)} · <b style="color:var(--ink)">${s.value}</b></span>`).join('')}
+    </div></div>`;
 }
 function weeklyData(){
   const weeks=[]; const now=new Date(); const monday=new Date(now); monday.setDate(now.getDate()-((now.getDay()+6)%7)); monday.setHours(0,0,0,0);
@@ -681,37 +775,61 @@ function weeklyData(){
   });
   return weeks.map(w=>({label:w.label, value:w.count}));
 }
+// atajos: fijar filtros desde el dashboard y saltar a la lista
+function dashGo(tab, opts){ opts=opts||{}; if(opts.minfit!=null)$('minfit').value=opts.minfit; if(opts.scope)$('scope').value=opts.scope; setTab(tab); }
+function dashFit(f){ $('minfit').value=String(f); setTab('all'); }
+
 function renderDash(){
   renderKpis();
-  const funnel=[
-    {label:'Descubiertas', value:DATA.length},
-    {label:'Aplicadas', value:DATA.filter(j=>j.applied_at).length},
-    {label:'Entrevista', value:DATA.filter(reachedInterview).length},
-    {label:'Oferta', value:DATA.filter(j=>j.response_status==='oferta').length},
-  ];
-  const bySite=Object.entries(DATA.reduce((m,j)=>{const s=j.site||'—';m[s]=(m[s]||0)+1;return m;},{}))
-    .map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,8);
-  const byFit=[];
-  for (let f=10;f>=4;f--) byFit.push({label:String(f), value:DATA.filter(j=>(j.fit_score??-1)===f).length});
   const k=computeKpis();
+  const offers=DATA.filter(j=>j.response_status==='oferta').length;
+  // hero stat tiles (clic = navegar)
+  const stats=[
+    {v:k.queue, kk:'listas para aplicar', cls:'accent', onClick:`dashGo('queue')`, sub:'fit ≥ 8, sin bloqueos'},
+    {v:k.applied, kk:'candidaturas enviadas', onClick:`setTab('applied')`, sub:`${k.week} esta semana · ${k.month} este mes`},
+    {v:k.interviews, kk:'entrevistas', cls:'good', onClick:`setTab('applied')`, sub:`tasa de respuesta ${k.resp_rate}%`},
+    {v:k.waiting, kk:'esperando respuesta', onClick:`setTab('followup')`, sub:'candidaturas sin cerrar'},
+    {v:k.rejected, kk:'rechazadas', cls:'bad', onClick:`setTab('rejected')`, sub:'fuera del pipeline'},
+    {v:offers, kk:'ofertas recibidas', cls:'good', sub:'¡el objetivo!'},
+  ];
+  // embudo
+  const funnel=[
+    {label:'Descubiertas', value:DATA.length, onClick:`dashGo('all',{minfit:0})`},
+    {label:'Aplicadas', value:DATA.filter(j=>j.applied_at).length, onClick:`setTab('applied')`},
+    {label:'Entrevista', value:DATA.filter(reachedInterview).length},
+    {label:'Oferta', value:offers},
+  ];
+  // estados de las enviadas (donut)
+  const applied=DATA.filter(j=>j.applied_at);
+  const inProc=applied.filter(j=>['entrevista','en_proceso'].includes(j.response_status)).length;
+  const donut=[
+    {label:'Esperando', value:applied.filter(j=>!j.response_status||j.response_status==='sin_respuesta').length, color:'var(--faint)', onClick:`setTab('followup')`},
+    {label:'En proceso', value:inProc, color:'var(--accent)'},
+    {label:'Oferta', value:applied.filter(j=>j.response_status==='oferta').length, color:'var(--green)'},
+    {label:'Rechazo', value:applied.filter(j=>j.response_status==='rechazo').length, color:'var(--danger)', onClick:`setTab('rejected')`},
+  ];
+  // distribución por fit (clic = ver esas)
+  const byFit=[];
+  for (let f=10;f>=4;f--) byFit.push({label:String(f), value:DATA.filter(j=>(j.fit_score??-1)===f).length, onClick:`dashFit(${f})`,
+    _hi:f>=8});
+  const fitColor=it=>it._hi?'var(--green)':'var(--accent)';
+  // ofertas por CV recomendado
+  const labels=cvLabels();
+  const byCv=Object.keys(labels).map(n=>({label:(labels[n]||('CV'+n)).replace(/·.*/,'').trim(),
+    value:DATA.filter(j=>j.cv_version===parseInt(n)&&(j.fit_score??0)>=6).length,
+    onClick:`dashGo('all',{minfit:6})`})).filter(x=>x.value);
+
   $('dash').innerHTML=`
-    <div class="dash-grid">
-      <div class="card"><h3>🎯 Embudo de candidaturas</h3>${svgBars(funnel,{horizontal:true,ordinal:true})}</div>
-      <div class="card"><h3>📈 Aplicaciones por semana <span class="sub">(últimas 10)</span></h3>${svgBars(weeklyData(),{horizontal:false})}</div>
-      <div class="card"><h3>📰 Ofertas por fuente</h3>${svgBars(bySite,{horizontal:true})}</div>
-      <div class="card"><h3>⚖️ Distribución por fit</h3>${svgBars(byFit,{horizontal:false})}</div>
+    <div class="dash-hero">
+      ${stats.map(s=>`<div class="stat ${s.cls||''} ${s.onClick?'clk':''}" ${s.onClick?`onclick="${s.onClick}"`:''}>
+        <div class="v">${s.v}</div><div class="k">${s.kk}</div>${s.sub?`<div class="sub2">${s.sub}</div>`:''}</div>`).join('')}
     </div>
-    <div class="card" style="margin-top:14px">
-      <h3>Resumen</h3>
-      <div style="font-size:13px;color:var(--ink2);line-height:1.9">
-        <b style="color:var(--ink)">${k.applied}</b> candidaturas enviadas ·
-        <b style="color:var(--ink)">${k.week}</b> esta semana ·
-        <b style="color:var(--ink)">${k.month}</b> este mes<br>
-        <b style="color:var(--green)">${k.interviews}</b> entrevistas conseguidas (tasa <b style="color:var(--green)">${k.resp_rate}%</b>) ·
-        <b>${k.waiting}</b> esperando respuesta ·
-        <b style="color:var(--danger)">${k.rejected}</b> rechazos<br>
-        <b style="color:var(--accent)">${k.queue}</b> ofertas listas para aplicar (fit ≥ 8, sin bloqueos).
-      </div>
+    <div class="dash-grid">
+      <div class="card"><h3>Embudo de candidaturas <span class="sub">clic para ver</span></h3>${svgHBars(funnel,{ordinal:true})}</div>
+      <div class="card"><h3>Estado de las enviadas</h3>${svgDonut(donut)}</div>
+      <div class="card"><h3>Aplicaciones por semana <span class="sub">últimas 10</span></h3>${svgVBars(weeklyData())}</div>
+      <div class="card"><h3>Distribución por fit <span class="sub">verde = listas</span></h3>${svgVBars(byFit,{colorFn:fitColor})}</div>
+      ${byCv.length?`<div class="card span2"><h3>Ofertas relevantes por CV recomendado <span class="sub">fit ≥ 6</span></h3>${svgHBars(byCv)}</div>`:''}
     </div>`;
 }
 
