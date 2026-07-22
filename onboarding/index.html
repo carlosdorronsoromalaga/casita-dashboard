@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ApplyBoard — Alta de perfil</title>
+<style>
+  :root {
+    --bg:#0b0e13; --panel:#141922; --panel2:#1b212c; --panel3:#222a36;
+    --line:#262e3a; --line2:#313b49; --text:#eaf0f7; --muted:#93a1b3; --faint:#69788c;
+    --green:#48d17f; --danger:#f77066;
+    --accent:#3987e5; --accent-soft:#6da7ec; --accent-strong:#1c5cab; --accent-wash:rgba(57,135,229,.12);
+    --radius:14px; --radius-sm:9px;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 22px rgba(0,0,0,.24);
+    --font:'Segoe UI',system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f6f7f9; --panel:#ffffff; --panel2:#f2f4f7; --panel3:#e9edf2;
+      --line:#e4e8ee; --line2:#d6dce4; --text:#141a22; --muted:#5b6675; --faint:#8a94a3;
+      --accent-wash:rgba(57,135,229,.10);
+      --shadow:0 1px 2px rgba(20,26,34,.06), 0 8px 26px rgba(20,26,34,.07); }
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:14.5px;
+         line-height:1.55; -webkit-font-smoothing:antialiased; }
+  ::selection { background:var(--accent-wash); }
+  .wrap { max-width:760px; margin:0 auto; padding:40px 20px 80px; }
+
+  .hero { text-align:center; margin-bottom:32px; }
+  .hero .dot { width:11px; height:11px; border-radius:50%; background:var(--accent);
+               box-shadow:0 0 0 5px var(--accent-wash); display:inline-block; margin-bottom:16px; }
+  .hero h1 { font-size:30px; font-weight:800; letter-spacing:-.02em; }
+  .hero p { color:var(--muted); font-size:15px; max-width:52ch; margin:10px auto 0; }
+  .hero .steps { color:var(--faint); font-size:13px; margin-top:14px; }
+
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+          padding:22px 22px; box-shadow:var(--shadow); margin-bottom:16px; }
+  .sec-h { display:flex; align-items:baseline; gap:10px; margin-bottom:4px; }
+  .sec-h .num { font-size:12px; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums;
+                background:var(--accent-wash); border-radius:6px; padding:2px 8px; }
+  .sec-h h2 { font-size:16px; font-weight:700; letter-spacing:-.01em; }
+  .sec-desc { color:var(--faint); font-size:12.5px; margin:2px 0 16px 0; }
+
+  label { display:block; font-size:12.5px; color:var(--muted); font-weight:500; margin:14px 0 5px; }
+  label .req { color:var(--accent); }
+  input[type=text], input[type=email], input[type=tel], input[type=number], select, textarea {
+    width:100%; background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:var(--radius-sm); padding:9px 12px; font-size:14px; font-family:inherit; outline:none;
+    transition:border-color .15s, box-shadow .15s; }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-wash); }
+  textarea { resize:vertical; min-height:64px; }
+  .hint { font-size:11.5px; color:var(--faint); margin-top:4px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; } .row > div { flex:1; min-width:200px; }
+
+  .checks { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-top:8px; }
+  .chk { display:flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--line);
+         border-radius:var(--radius-sm); padding:9px 11px; cursor:pointer; font-size:13.5px; transition:border-color .15s, background .15s; }
+  .chk:hover { border-color:var(--line2); }
+  .chk input { accent-color:var(--accent); width:15px; height:15px; }
+  .chk.on { border-color:var(--accent); background:var(--accent-wash); }
+
+  .cvrow { display:flex; gap:10px; align-items:center; margin-top:8px; }
+  .cvrow .n { font-size:12px; font-weight:700; color:var(--accent); flex:0 0 auto; width:34px; }
+  .addcv { margin-top:10px; background:var(--panel2); border:1px dashed var(--line2); color:var(--muted);
+           border-radius:var(--radius-sm); padding:8px 12px; font-size:13px; cursor:pointer; font-family:inherit; }
+  .addcv:hover { border-color:var(--accent); color:var(--accent); }
+
+  .submit { width:100%; background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm);
+            padding:14px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; margin-top:8px;
+            transition:background .15s; }
+  .submit:hover { background:var(--accent-strong); }
+  .err { color:var(--danger); font-size:13px; margin-top:10px; text-align:center; min-height:18px; }
+
+  /* pantalla de éxito */
+  .done { display:none; text-align:center; }
+  .done.show { display:block; }
+  .done .big { font-size:46px; }
+  .done h2 { font-size:22px; font-weight:800; margin:10px 0 8px; }
+  .done p { color:var(--muted); max-width:46ch; margin:0 auto 20px; }
+  .done .actions { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .done .actions a, .done .actions button { background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:var(--radius-sm); padding:11px 18px; font-size:14px; font-weight:600; cursor:pointer;
+    text-decoration:none; font-family:inherit; }
+  .done .actions .primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  pre.summary { text-align:left; background:var(--panel2); border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:16px; font-size:12.5px; white-space:pre-wrap; margin-top:22px; max-height:340px; overflow:auto;
+    font-family:'SF Mono','Cascadia Code',Consolas,monospace; color:var(--muted); }
+  .foot { text-align:center; color:var(--faint); font-size:12px; margin-top:28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== formulario ===== -->
+  <div id="formView">
+    <div class="hero">
+      <span class="dot"></span>
+      <h1>Crea tu perfil de búsqueda</h1>
+      <p>Rellena esto y se montará un buscador de empleo automático a tu medida: descubre ofertas
+         en varias fuentes, las puntúa según tu perfil y te las deja listas para aplicar.</p>
+      <div class="steps">Rellenar (5 min) → lo revisa Carlos → tu ApplyBoard queda activo</div>
+    </div>
+
+    <!-- 1. Datos -->
+    <div class="card">
+      <div class="sec-h"><span class="num">1</span><h2>Datos personales</h2></div>
+      <div class="sec-desc">Para contactarte y para la firma de las cartas/emails.</div>
+      <div class="row">
+        <div><label>Nombre completo <span class="req">*</span></label><input type="text" id="fullName"></div>
+        <div><label>Nombre corto (cabecera)</label><input type="text" id="displayName" placeholder="p. ej. Alejandra"></div>
+      </div>
+      <div class="row">
+        <div><label>Email <span class="req">*</span></label><input type="email" id="email"></div>
+        <div><label>Teléfono</label><input type="tel" id="phone"></div>
+      </div>
+      <div class="row">
+        <div><label>Ubicación actual</label><input type="text" id="currentLoc" placeholder="Madrid, España"></div>
+        <div><label>LinkedIn / web</label><input type="text" id="linkedin"></div>
+      </div>
+    </div>
+
+    <!-- 2. Objetivo -->
+    <div class="card">
+      <div class="sec-h"><span class="num">2</span><h2>Qué buscas</h2></div>
+      <div class="sec-desc">Cuanto más concreto, mejor puntúa el sistema. Separa por comas.</div>
+      <label>Puestos objetivo <span class="req">*</span></label>
+      <input type="text" id="roles" placeholder="AI Product Manager, Strategy Consultant, Business Analyst…">
+      <div class="hint">Los títulos con los que se buscará en los portales.</div>
+      <label>Sector / palabras clave</label>
+      <input type="text" id="sector" placeholder="wealth management, private banking, graduate program…">
+      <div class="hint">Se usan para resaltar y filtrar tu sector en el panel.</div>
+      <div class="row">
+        <div>
+          <label>Nivel / experiencia</label>
+          <select id="seniority">
+            <option value="">Elige…</option>
+            <option>Recién graduado / prácticas</option>
+            <option>Junior (0-2 años)</option>
+            <option>Mid (2-5 años)</option>
+            <option>Senior (5+ años)</option>
+          </select>
+        </div>
+        <div>
+          <label>Contrato deseado</label>
+          <select id="contract">
+            <option value="">Indiferente</option>
+            <option>Indefinido</option>
+            <option>Graduate program / traineeship</option>
+            <option>Prácticas</option>
+            <option>Temporal / freelance</option>
+          </select>
+        </div>
+      </div>
+      <label>Salario objetivo (opcional)</label>
+      <input type="text" id="salary" placeholder="p. ej. 55.000–70.000 € brutos/año">
+    </div>
+
+    <!-- 3. Geografía -->
+    <div class="card">
+      <div class="sec-h"><span class="num">3</span><h2>Dónde quieres trabajar</h2></div>
+      <div class="sec-desc">Estas zonas serán tus filtros en el panel. Marca todas las que apliquen.</div>
+      <div class="checks" id="geoChecks"></div>
+      <label>Otras ciudades/países (separados por comas)</label>
+      <input type="text" id="geoOther" placeholder="Valencia, Sevilla, Lisboa…">
+      <div class="row">
+        <div><label>¿Te mudas? ¿Cuándo?</label><input type="text" id="relocate" placeholder="Sí, a Ámsterdam en sept. 2026 / No"></div>
+        <div><label>Prioridad principal</label><input type="text" id="geoPriority" placeholder="Madrid"></div>
+      </div>
+    </div>
+
+    <!-- 4. Idiomas -->
+    <div class="card">
+      <div class="sec-h"><span class="num">4</span><h2>Idiomas</h2></div>
+      <div class="row">
+        <div><label>Idiomas que hablas</label><input type="text" id="langsSpoken" placeholder="Español (nativo), Inglés (C1), Neerlandés (B1)…"></div>
+        <div><label>Idiomas que NO hablas y descartarían la oferta</label><input type="text" id="langsBlock" placeholder="p. ej. francés, alemán"></div>
+      </div>
+      <div class="hint">Si una oferta exige un idioma de la derecha, se marcará como bloqueante.</div>
+    </div>
+
+    <!-- 5. CVs -->
+    <div class="card">
+      <div class="sec-h"><span class="num">5</span><h2>Tus versiones de CV</h2></div>
+      <div class="sec-desc">¿Con qué CVs aplicas? Ponles un nombre. Los ficheros los mandas aparte por email.
+        El sistema recomendará cuál usar por cada oferta.</div>
+      <div id="cvList"></div>
+      <button type="button" class="addcv" onclick="addCv()">＋ Añadir otra versión de CV</button>
+    </div>
+
+    <!-- 6. Extras -->
+    <div class="card">
+      <div class="sec-h"><span class="num">6</span><h2>Afinar (opcional)</h2></div>
+      <label>Empresas objetivo</label>
+      <input type="text" id="targetCos" placeholder="Empresas concretas donde te encantaría entrar">
+      <div class="hint">Si tienen web de empleo propia, se rastrean directamente (más ofertas que solo LinkedIn).</div>
+      <label>Qué evitar</label>
+      <input type="text" id="avoid" placeholder="sectores, tipos de rol o ciudades que NO quieres">
+      <div class="row" style="margin-top:6px">
+        <div>
+          <label>¿Quieres cartas de motivación automáticas?</label>
+          <select id="wantLetters">
+            <option value="si">Sí, generádmelas (plan completo)</option>
+            <option value="no">No, solo búsqueda + CV recomendado</option>
+          </select>
+        </div>
+        <div>
+          <label>Color del panel</label>
+          <select id="theme">
+            <option value="blue">Azul</option>
+            <option value="purple">Morado</option>
+            <option value="green">Verde</option>
+            <option value="amber">Ámbar</option>
+          </select>
+        </div>
+      </div>
+      <label>Notas libres</label>
+      <textarea id="notes" placeholder="Cualquier cosa que ayude a entender tu búsqueda…"></textarea>
+    </div>
+
+    <button class="submit" onclick="submitForm()">Enviar mi perfil →</button>
+    <div class="err" id="err"></div>
+    <div class="foot">Tus datos solo se usan para montar tu buscador. Nada se publica.</div>
+  </div>
+
+  <!-- ===== éxito ===== -->
+  <div id="doneView" class="done">
+    <div class="big">✅</div>
+    <h2>¡Perfil enviado!</h2>
+    <p>Carlos lo revisará y activará tu ApplyBoard. Mientras, mándale por email los ficheros de tus CVs.
+       Si quieres, guarda una copia de tu resumen:</p>
+    <div class="actions">
+      <a class="primary" id="mailBtn" href="#">✉️ Enviárselo también por email</a>
+      <button onclick="copySummary(this)">📋 Copiar resumen</button>
+      <button onclick="downloadJson()">⬇️ Descargar (.json)</button>
+    </div>
+    <pre class="summary" id="summaryBox"></pre>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SB_URL='https://wzikfazbfgtxljtkkphm.supabase.co';
+const SB_ANON='sb_publishable_pMmT_8oxKBcqU-fD_4yTqA_YKNVm6jN';
+const CARLOS_EMAIL='carlos.dorronsoro.malaga@gmail.com';
+const $=id=>document.getElementById(id);
+
+// zonas geográficas -> se convierten en scopes del panel
+const GEO=[
+  ['spain','🇪🇸 España'],['madrid','📍 Madrid'],['barcelona','📍 Barcelona'],
+  ['nl','🇳🇱 Países Bajos'],['benelux','🇧🇪🇱🇺 Bélgica/Luxemburgo'],
+  ['ireland','🇮🇪 Irlanda'],['europe','🇪🇺 Resto de Europa'],['remote','🏠 Remoto'],
+];
+$('geoChecks').innerHTML=GEO.map(([v,l])=>
+  `<label class="chk" onclick="this.classList.toggle('on',this.querySelector('input').checked)">
+     <input type="checkbox" value="${v}">${l}</label>`).join('');
+
+// CVs dinámicos
+let cvN=0;
+function addCv(val){
+  cvN++; const d=document.createElement('div'); d.className='cvrow';
+  d.innerHTML=`<span class="n">CV${cvN}</span><input type="text" class="cvlabel" placeholder="p. ej. Consultoría / Estrategia">`;
+  if(val) d.querySelector('input').value=val;
+  $('cvList').appendChild(d);
+}
+addCv(); addCv();  // arranca con dos
+
+let LAST=null;
+function collect(){
+  const geo=[...document.querySelectorAll('#geoChecks input:checked')].map(c=>c.value);
+  const cvs=[...document.querySelectorAll('.cvlabel')].map(i=>i.value.trim()).filter(Boolean);
+  return {
+    fullName:$('fullName').value.trim(), displayName:$('displayName').value.trim(),
+    email:$('email').value.trim(), phone:$('phone').value.trim(),
+    currentLoc:$('currentLoc').value.trim(), linkedin:$('linkedin').value.trim(),
+    roles:$('roles').value.trim(), sector:$('sector').value.trim(),
+    seniority:$('seniority').value, contract:$('contract').value, salary:$('salary').value.trim(),
+    geoScopes:geo, geoOther:$('geoOther').value.trim(), relocate:$('relocate').value.trim(), geoPriority:$('geoPriority').value.trim(),
+    langsSpoken:$('langsSpoken').value.trim(), langsBlock:$('langsBlock').value.trim(),
+    cvLabels:cvs, targetCos:$('targetCos').value.trim(), avoid:$('avoid').value.trim(),
+    wantLetters:$('wantLetters').value, theme:$('theme').value, notes:$('notes').value.trim(),
+    submittedAt:new Date().toISOString(),
+  };
+}
+function summaryText(d){
+  const L=[]; const add=(k,v)=>{ if(v&&v.length) L.push(k+': '+(Array.isArray(v)?v.join(', '):v)); };
+  L.push('=== ALTA APPLYBOARD ===');
+  add('Nombre', d.fullName); add('Nombre corto', d.displayName); add('Email', d.email); add('Teléfono', d.phone);
+  add('Ubicación', d.currentLoc); add('LinkedIn/web', d.linkedin);
+  L.push('');
+  add('Puestos objetivo', d.roles); add('Sector/keywords', d.sector);
+  add('Nivel', d.seniority); add('Contrato', d.contract); add('Salario', d.salary);
+  L.push('');
+  add('Zonas', d.geoScopes); add('Otras zonas', d.geoOther); add('Prioridad', d.geoPriority); add('Mudanza', d.relocate);
+  L.push('');
+  add('Idiomas', d.langsSpoken); add('Idiomas bloqueantes', d.langsBlock);
+  L.push('');
+  add('CVs', d.cvLabels);
+  add('Empresas objetivo', d.targetCos); add('Evitar', d.avoid);
+  add('Cartas automáticas', d.wantLetters==='si'?'sí':'no'); add('Tema', d.theme);
+  add('Notas', d.notes);
+  return L.join('\n');
+}
+async function submitForm(){
+  const d=collect();
+  if(!d.fullName||!d.email||!d.roles||!d.geoScopes.length){
+    $('err').textContent='Faltan campos obligatorios: nombre, email, puestos objetivo y al menos una zona.';
+    window.scrollTo({top:0,behavior:'smooth'}); return;
+  }
+  $('err').textContent='';
+  LAST=d;
+  // intenta guardar en Supabase (tabla onboarding_requests); si no existe, no pasa nada
+  try{
+    const sb=supabase.createClient(SB_URL,SB_ANON);
+    await sb.from('onboarding_requests').insert({ payload:d, email:d.email, name:d.fullName });
+  }catch(e){ /* fallback: email/copia */ }
+  // preparar pantalla de éxito
+  const txt=summaryText(d);
+  $('summaryBox').textContent=txt;
+  $('mailBtn').href='mailto:'+CARLOS_EMAIL+'?subject='+encodeURIComponent('Alta ApplyBoard — '+d.fullName)
+    +'&body='+encodeURIComponent(txt+'\n\n(Adjunto mis CVs en este email.)');
+  $('formView').style.display='none';
+  $('doneView').classList.add('show');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function copySummary(btn){ navigator.clipboard.writeText($('summaryBox').textContent).then(()=>{ const o=btn.textContent; btn.textContent='✓ Copiado'; setTimeout(()=>btn.textContent=o,1500); }); }
+function downloadJson(){
+  const blob=new Blob([JSON.stringify(LAST,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='alta_applyboard_'+(LAST.displayName||LAST.fullName||'perfil').replace(/\s+/g,'_')+'.json'; a.click();
+}
+</script>
+</body>
+</html>
